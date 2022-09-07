@@ -1,0 +1,18 @@
+[package]
+name = "continue_example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# librr_rs = {git="https://github.com/zaporter/librr_rs"}
+librr_rs = {path="../librr_rs/"}
+serial_test = "0.8.0"
+rand = "0.8.5"
+gag = "1.0.0"
+object="0.29"
+symbolic={version="9.1",features=["demangle"]}
+symbolic-demangle={version="9.1", features=["rust", "cpp", "msvc"]}
+symbolic-common={version="9.1"}
+procmaps = {git = "https://github.com/zaporter/procmaps"}
