@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 
 use druid::{
-    kurbo::{Circle, Shape},
+    kurbo::{Circle, Shape, Line},
     widget::Label,
     BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, Lens, LifeCycle, LifeCycleCtx,
     PaintCtx, Point, RenderContext, Size, UpdateCtx, Widget, WidgetPod, Vec2, MouseButton, piet::TextLayoutBuilder,
@@ -138,10 +138,24 @@ impl Widget<CodeFlowState> for CodeFlowGraph {
         let size: Size = ctx.size();
         let width = size.width;
         let height = size.height;
-        for node in data.graph_layout.nodes.values() {
-            let node_pos = Point::new((node.position.x+data.center.x) *width*data.zoom, (node.position.y+data.center.y) *height*data.zoom);
+        for (link,val) in data.graph_layout.links.iter(){
+            let p0 = data.graph_layout.nodes.get(&link.0).unwrap();
+            let p1 = data.graph_layout.nodes.get(&link.1).unwrap();
+            let origin = Point::new(
+                (p0.position.x+data.center.x) *width*data.zoom, 
+                (p0.position.y+data.center.y) *height*data.zoom);
+            let dest = Point::new(
+                (p1.position.x+data.center.x) *width*data.zoom, 
+                (p1.position.y+data.center.y) *height*data.zoom);
+            ctx.stroke(Line::new(origin,dest), &Color::BLUE, 1.*val.raw_link.attributes.count as f64);
 
-            ctx.fill(Circle::new(node_pos, 50.0), &Color::RED)
+        }
+        for node in data.graph_layout.nodes.values() {
+            let node_pos = Point::new(
+                (node.position.x+data.center.x) *width*data.zoom, 
+                (node.position.y+data.center.y) *height*data.zoom);
+
+            ctx.fill(Circle::new(node_pos, 50.0), &Color::RED);
         }
     }
     fn update(

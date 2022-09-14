@@ -8,7 +8,7 @@ use crate::block::{Block, CodeFlow};
 
 #[derive(Default, Debug, Clone)]
 pub struct LinkAttributes {
-    count: usize,
+    pub count: usize,
 }
 #[derive(Default, Debug, Clone)]
 pub struct PositionedPath {
@@ -19,11 +19,11 @@ pub struct PositionedPath {
 pub struct Link {
     origin: usize,
     destination: usize,
-    attributes: LinkAttributes,
+    pub attributes: LinkAttributes,
 }
 #[derive(Default, Debug, Clone)]
 pub struct PositionedLink {
-    raw_link: Link,
+    pub raw_link: Link,
     path: PositionedPath,
 }
 #[derive(Debug, Clone)]
@@ -33,9 +33,9 @@ pub struct PositionedNode {
     velocity: Vec2,
 }
 
-const REPEL_FORCE: f64 = 0.05; // d^2
-const ATTRACT_FORCE: f64 = 0.10; // d
-const MIN_ATTRACT_DISTANCE: f64 = 1.0;
+const REPEL_FORCE: f64 = 0.10; // d^2
+const ATTRACT_FORCE: f64 = 0.20; // d
+const MIN_ATTRACT_DISTANCE: f64 = 5.0;
 
 const AREA_WIDTH: f64 = 1.0;
 const AREA_HEIGHT: f64 = 1.0;
@@ -112,7 +112,7 @@ impl GraphLayout {
             links,
             nodes,
         };
-        layout.force_position(200);
+        layout.force_position(500);
         layout.normalize();
         // for k in layout.nodes.values() {
         //     dbg!(k.position);
