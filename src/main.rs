@@ -1,51 +1,56 @@
+#![allow(unused_imports)]
 use iced_x86::{
     Code, ConditionCode, Decoder, DecoderOptions, FlowControl, Instruction, InstructionInfoFactory,
-    OpKind, RflagsBits,
+    OpKind, RflagsBits, Register,
 };
+use itertools::Itertools;
 use librr_rs::*;
-use object::{
-    Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, Section, SectionKind, Segment,
-};
 use rust_lapper::{Interval, Lapper};
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::{error::Error, sync::Arc};
-use symbolic_common::{Language, Name};
-use symbolic_demangle::{Demangle, DemangleOptions};
-
 use std::time::SystemTime;
 
 use crate::block::{Block, BlockEvaluation, CodeFlow};
 
-mod block;
-mod gui;
-mod code_flow_graph;
-mod graph_layout;
 
-fn get_symbols<'a>(
-    file: &'a object::File,
-) -> Result<Vec<(String, object::Symbol<'a, 'a>)>, Box<dyn Error>> {
-    let mut to_ret = Vec::new();
-    for symbol in file.symbol_table().ok_or("No symboltable found")?.symbols() {
-        let name: String = Name::from(symbol.name().unwrap())
-            .try_demangle(DemangleOptions::name_only())
-            .to_string();
-        to_ret.push((name, symbol));
-    }
-    Ok(to_ret)
-}
+mod block;
+// mod code_flow_graph;
+// mod graph_layout;
+// mod gui;
+mod trampoline;
+use crate::trampoline::*;
+
+// fn get_symbols<'a>(
+//     file: &'a object::File,
+// ) -> Result<Vec<(String, object::Symbol<'a, 'a>)>, Box<dyn Error>> {
+//     let mut to_ret = Vec::new();
+//     for symbol in file.symbol_table().ok_or("No symboltable found")?.symbols() {
+//         let name: String = Name::from(symbol.name().unwrap())
+//             .try_demangle(DemangleOptions::name_only())
+//             .to_string();
+//         to_ret.push((name, symbol));
+//     }
+//     Ok(to_ret)
+// }
 fn main() {
-    // let sample_dateviewer_dir = PathBuf::from_str("/home/zack/.local/share/rr/binary-0").unwrap();
-    let sample_dateviewer_dir = PathBuf::from_str("/home/zack/.local/share/rr/fizzbuzz-0/").unwrap();
     // let sample_dateviewer_dir =
-    //     PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-95").unwrap();
+    //     PathBuf::from_str("/home/zack/.local/share/rr/hello_world-5").unwrap();
+    // let sample_dateviewer_dir =
+    //     PathBuf::from_str("/home/zack/.local/share/rr/fizzbuzz-5/").unwrap();
+    // let sample_dateviewer_dir =
+    //     PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-102").unwrap();
     // let sample_dateviewer_dir =
     //     PathBuf::from_str("/home/zack/.local/share/rr/cargo-1").unwrap();
     // let main_addr :usize = 0x558ce6f8b060;
-    // let sample_dateviewer_dir =
-    //     PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-2").unwrap();
-    let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir);
+    let sample_dateviewer_dir =
+        PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap();
+    let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir.clone());
+
+    let rip = bin_interface
+        .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+        .to_usize();
+    dbg!(rip);
 
     let start = SystemTime::now();
 
@@ -54,13 +59,70 @@ fn main() {
     dbg!(duration);
     dbg!(code_flow.blocks.len());
     dbg!(code_flow.path.len());
-    gui::start_code_flow_examiner(code_flow);
+    // let first_block = code_flow.blocks.into_iter().next().unwrap().val;
+    // let instructions = first_block.instructions();
+    // let instructions = &read_instructions(&bin_interface, 0x401000, 0x1000);
+    // let instructions = &read_instructions(&bin_interface, 0x55555555a000, 0x3a000);
+    let instructions = &read_instructions(&bin_interface, 0x55555555b000, 0x42000);
+    // dbg!(&instructions);
+
+    //let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir);
+    let rip = bin_interface
+        .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+        .to_usize();
+    dbg!(rip);
+    // build_trampoline_for_instr(&mut bin_interface, &int_instr).unwrap();
+    let mut tr = TrampolineManager::default();
+    let possible_vuln_jumps = tr.identify_possible_vulnerable_jumps(instructions);
+    dbg!(possible_vuln_jumps.len());
+    tr.setup_stack_ptr(&mut bin_interface).unwrap();
+    tr.create_trampolines(&mut bin_interface, instructions, possible_vuln_jumps.into_keys().collect_vec())
+        .unwrap();
+    // tr.patch_jumps_into_trampoline(&mut bin_interface, possible_vuln_jumps);
+    dbg!(tr.unwatched_instructions.len());
+    dbg!(tr.allocations.len());
+    // let code_flow = create_code_flow(&mut bin_interface).unwrap();
+    // let first_block = code_flow.blocks.into_iter().next().unwrap().val;
+    let step = GdbContAction {
+        type_: GdbActionType::ACTION_CONTINUE,
+        target: bin_interface.get_current_thread(),
+        signal_to_deliver: 0,
+    };
+    let mut num_instructions: u128 = 0;
+    let mut signal = 5;
+    while signal == 5 {
+        num_instructions+=1;
+        signal = bin_interface.pin_mut().continue_forward(step);
+        // let rip = bin_interface
+        //     .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+        //     .to_usize();
+        // dbg!(rip);
+        // let current = get_current_instr(&bin_interface);
+        // println!("{}",current);
+    }
+    dbg!(num_instructions);
+    tr.clear_address_stack(&mut bin_interface).unwrap();
+    let entries = tr.recorded_addresses();
+    dbg!(entries.len());
+
+    // gui::start_code_flow_examiner(code_flow);
 }
-// fn fill_in_jumps(code_flow: &mut CodeFlow){
 
+/**
+ * DO NOT USE FOR PROD. 
+ * VERY SLOW
+ */
+fn get_current_instr(bin_interface: &BinaryInterface)->Instruction{
+    let rip = bin_interface
+        .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+        .to_usize();
 
-// }
-
+    let bytes = bin_interface.get_mem(rip, 18);
+    let mut decoder = Decoder::with_ip(64, &bytes, rip as u64, DecoderOptions::NONE);
+    let mut instr = Instruction::default();
+    decoder.decode_out(&mut instr);
+    instr
+}
 fn create_code_flow(bin_interface: &mut BinaryInterface) -> Result<CodeFlow, Box<dyn Error>> {
     let cthread = bin_interface.get_current_thread();
     bin_interface.pin_mut().set_query_thread(cthread);
@@ -106,6 +168,7 @@ fn create_code_flow(bin_interface: &mut BinaryInterface) -> Result<CodeFlow, Box
             code_flow.blocks.find(rip, rip).next().unwrap().val.clone()
         };
 
+        break 'outer;
         let instructions = block.instructions();
 
         bin_interface
@@ -113,7 +176,6 @@ fn create_code_flow(bin_interface: &mut BinaryInterface) -> Result<CodeFlow, Box
             .set_sw_breakpoint(instructions.last().unwrap().ip() as usize, 1);
         signal = bin_interface.pin_mut().continue_forward(cont);
         if signal != 5 {
-            dbg!("SIGNAL 9");
             break 'outer;
         }
         bin_interface
@@ -123,6 +185,22 @@ fn create_code_flow(bin_interface: &mut BinaryInterface) -> Result<CodeFlow, Box
     }
 
     Ok(code_flow)
+}
+
+fn read_instructions(
+    bin_interface: &BinaryInterface,
+    start_addr: usize,
+    size: usize,
+) -> Vec<Instruction> {
+    let bytes = bin_interface.get_mem(start_addr, size);
+    let mut instructions = Vec::new();
+    let mut decoder = Decoder::with_ip(64, &bytes, start_addr as u64, DecoderOptions::NONE);
+    let mut instr = Instruction::default();
+    while decoder.can_decode() {
+        decoder.decode_out(&mut instr);
+        instructions.push(instr);
+    }
+    instructions
 }
 
 const READ_CHUNK_SIZE: usize = 40;

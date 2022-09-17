@@ -2010,8 +2010,8 @@ dependencies = [
 
 [[package]]
 name = "rust-lapper"
-version = "1.0.1"
-source = "git+https://github.com/zaporter/rust-lapper#83a89831fdaa0832cfd68cc0d4764da62ae0c8e8"
+version = "1.1.0"
+source = "git+https://github.com/zaporter/rust-lapper#8c4400493ab05d35828bba1d42ca266cd3a65da3"
 dependencies = [
  "num-traits",
 ]

@@ -36,9 +36,10 @@ pub struct PositionedNode {
 const REPEL_FORCE: f64 = 0.10; // d^2
 const ATTRACT_FORCE: f64 = 0.20; // d
 const MIN_ATTRACT_DISTANCE: f64 = 5.0;
+const NUM_FORCE_LOOPS:usize = 500;
 
-const AREA_WIDTH: f64 = 1.0;
-const AREA_HEIGHT: f64 = 1.0;
+// const AREA_WIDTH: f64 = 1.0;
+// const AREA_HEIGHT: f64 = 1.0;
 
 #[derive(Debug)]
 pub struct GraphLayout {
@@ -57,8 +58,6 @@ impl GraphLayout {
     pub fn new(data: CodeFlow) -> GraphLayout {
         let mut links: HashMap<(usize, usize), PositionedLink> = HashMap::new();
         let mut nodes = HashMap::new();
-        let len = data.blocks.len();
-        let mut i = 0;
         let mut rng = rand::thread_rng();
         for node_data in data.blocks.iter() {
             nodes.insert(
@@ -68,13 +67,10 @@ impl GraphLayout {
                     position: Vec2 {
                         x:rng.gen(),
                         y:rng.gen(),
-                        // x: ((i %2) as f64 / (2. * len as f64)),
-                        // y: (i as f64) / (len as f64),
                     },
                     velocity: Vec2::default(),
                 },
             );
-            i += 1;
         }
         for (start_path, end) in data.path.iter().tuple_windows() {
             let block_base = data
@@ -112,7 +108,7 @@ impl GraphLayout {
             links,
             nodes,
         };
-        layout.force_position(500);
+        layout.force_position(NUM_FORCE_LOOPS);
         layout.normalize();
         // for k in layout.nodes.values() {
         //     dbg!(k.position);

@@ -1,13 +1,13 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, sync::Arc};
 
 use druid::{
-    kurbo::{Circle, Shape, Line},
+    kurbo::{Circle, Shape, Line, RoundedRect},
     widget::Label,
     BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, Lens, LifeCycle, LifeCycleCtx,
-    PaintCtx, Point, RenderContext, Size, UpdateCtx, Widget, WidgetPod, Vec2, MouseButton, piet::TextLayoutBuilder,
+    PaintCtx, Point, RenderContext, Size, UpdateCtx, Widget, WidgetPod, Vec2, MouseButton, piet::{TextLayoutBuilder, Text, TextAttribute}, RadialGradient, LinearGradient, UnitPoint,
 };
 
-
+use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, NasmFormatter};
 use crate::{
     block::{Block, CodeFlow},
     graph_layout::GraphLayout,
@@ -85,11 +85,15 @@ impl Widget<CodeFlowState> for CodeFlowGraph {
     let current_size= ctx.size();
     match event{
         Event::Wheel(e)=>{
+            let (c_x, c_y) = (data.center.x-(0.5/data.zoom), data.center.y-(0.5/data.zoom));
+            
             if e.wheel_delta.y >0.0{
                 data.zoom/=1.1;
             }else {
                 data.zoom*=1.1;
             }
+            data.center.x = c_x + (0.5/data.zoom);
+            data.center.y = c_y + (0.5/data.zoom);
             ctx.request_paint();
         },
         Event::MouseDown(e)=> {
@@ -147,16 +151,48 @@ impl Widget<CodeFlowState> for CodeFlowGraph {
             let dest = Point::new(
                 (p1.position.x+data.center.x) *width*data.zoom, 
                 (p1.position.y+data.center.y) *height*data.zoom);
-            ctx.stroke(Line::new(origin,dest), &Color::BLUE, 1.*val.raw_link.attributes.count as f64);
+            let grad = LinearGradient::new(UnitPoint::new(p0.position.x,p0.position.y), UnitPoint::new(p1.position.x,p1.position.y),(Color::FUCHSIA, Color::AQUA));
+            ctx.stroke(Line::new(origin,dest), &grad, 1.*val.raw_link.attributes.count as f64);
 
         }
         for node in data.graph_layout.nodes.values() {
-            let node_pos = Point::new(
+            let mut node_pos = Point::new(
                 (node.position.x+data.center.x) *width*data.zoom, 
                 (node.position.y+data.center.y) *height*data.zoom);
 
-            ctx.fill(Circle::new(node_pos, 50.0), &Color::RED);
+            let width= 250.;
+            let height = 14.*node.val.instructions().len()as f64;
+            node_pos.x-=width/2.;
+            node_pos.y-=height/2.;
+            ctx.fill(RoundedRect::new(node_pos.x-7.,node_pos.y-7.,node_pos.x+width+7.,node_pos.y+height+7.,10.0), &Color::BLACK);
+            ctx.fill(RoundedRect::new(node_pos.x-5.,node_pos.y-5.,node_pos.x+width+5.,node_pos.y+height+5.,10.0), &Color::WHITE);
+           let mut formatter = NasmFormatter::new();
+
+            // // Change some options, there are many more
+            // formatter.options_mut().set_digit_separator("`");
+            formatter.options_mut().set_first_operand_char_index(10);
+            formatter.options_mut().set_leading_zeros(false);
+            // formatter.options_mut().set_se_operand_char_index(10);
+
+            // String implements FormatterOutput
+            let mut output = String::new();
+
+
+            for instruction in node.val.instructions(){
+                output.clear();
+                formatter.format(&instruction, &mut output);
+
+
+                let text = ctx.text();
+                let line = text.new_text_layout(output.clone())
+                    .default_attribute(TextAttribute::FontSize(14.0))
+                    .build().unwrap();
+                
+                ctx.draw_text(&line, node_pos);
+                node_pos.y+=12.;
+            }
         }
+
     }
     fn update(
         &mut self,
