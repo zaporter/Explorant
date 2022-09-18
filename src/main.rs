@@ -5,6 +5,7 @@ use iced_x86::{
 };
 use itertools::Itertools;
 use librr_rs::*;
+use procmaps::{Mappings, Map};
 use rust_lapper::{Interval, Lapper};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -38,19 +39,34 @@ fn main() {
     //     PathBuf::from_str("/home/zack/.local/share/rr/hello_world-5").unwrap();
     // let sample_dateviewer_dir =
     //     PathBuf::from_str("/home/zack/.local/share/rr/fizzbuzz-5/").unwrap();
-    // let sample_dateviewer_dir =
-    //     PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-102").unwrap();
+    let sample_dateviewer_dir =
+        PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-104").unwrap();
     // let sample_dateviewer_dir =
     //     PathBuf::from_str("/home/zack/.local/share/rr/cargo-1").unwrap();
     // let main_addr :usize = 0x558ce6f8b060;
-    let sample_dateviewer_dir =
-        PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap();
+    // let sample_dateviewer_dir =
+    //     PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap();
     let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir.clone());
 
     let rip = bin_interface
         .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
         .to_usize();
     dbg!(rip);
+
+    let stack_info = TrampolineStackInfo{
+        base_addr: 0x71000000, 
+        size:0x100000,
+        reserved_space:0x40,
+    };
+    todo!();
+    stack_info.allocate_map(&mut bin_interface);
+    dbg!(bin_interface.get_proc_map());
+    let mut proc_map : Lapper<usize,Map>= Lapper::new(vec![]);
+    for map in bin_interface.get_proc_map().unwrap().iter(){
+        proc_map.insert(Interval{start:map.base, stop:map.ceiling,val:map.clone()});
+    }
+    // let main_executable = &proc_map.iter().find(|k| k.val.base == 93824992256000).unwrap().val;
+    let main_executable = &proc_map.iter().find(|k| k.val.base == 140737353920512).unwrap().val;
 
     let start = SystemTime::now();
 
@@ -59,20 +75,13 @@ fn main() {
     dbg!(duration);
     dbg!(code_flow.blocks.len());
     dbg!(code_flow.path.len());
-    // let first_block = code_flow.blocks.into_iter().next().unwrap().val;
-    // let instructions = first_block.instructions();
-    // let instructions = &read_instructions(&bin_interface, 0x401000, 0x1000);
-    // let instructions = &read_instructions(&bin_interface, 0x55555555a000, 0x3a000);
-    let instructions = &read_instructions(&bin_interface, 0x55555555b000, 0x42000);
-    // dbg!(&instructions);
-
-    //let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir);
+    let instructions = &read_instructions(&bin_interface, main_executable.base, main_executable.ceiling-main_executable.base);
     let rip = bin_interface
         .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
         .to_usize();
     dbg!(rip);
     // build_trampoline_for_instr(&mut bin_interface, &int_instr).unwrap();
-    let mut tr = TrampolineManager::default();
+    let mut tr = TrampolineManager::new_for(&mut bin_interface, stack_info, main_executable, &proc_map);
     let possible_vuln_jumps = tr.identify_possible_vulnerable_jumps(instructions);
     dbg!(possible_vuln_jumps.len());
     tr.setup_stack_ptr(&mut bin_interface).unwrap();

@@ -1890,7 +1890,7 @@ dependencies = [
 [[package]]
 name = "procmaps"
 version = "0.4.2"
-source = "git+https://github.com/zaporter/procmaps#50b2c0cb33e779c901801c888aec6754d4ffcf14"
+source = "git+https://github.com/zaporter/procmaps#06230fefd903afc19e62a97ec412694d04046173"
 dependencies = [
  "libc",
  "nom 4.2.3",
@@ -2011,7 +2011,7 @@ dependencies = [
 [[package]]
 name = "rust-lapper"
 version = "1.1.0"
-source = "git+https://github.com/zaporter/rust-lapper#8c4400493ab05d35828bba1d42ca266cd3a65da3"
+source = "git+https://github.com/zaporter/rust-lapper#969ef04c70595d1ad45110570baa6814483eecc1"
 dependencies = [
  "num-traits",
 ]

@@ -3,6 +3,7 @@ use iced_x86::{
     OpKind, Register, RflagsBits,
 };
 use librr_rs::*;
+use procmaps::Map;
 use rust_lapper::{Interval, Lapper};
 use std::{collections::HashMap, error::Error};
 
@@ -28,6 +29,11 @@ pub struct TrampolineStackInfo {
     pub size: usize,
     pub reserved_space: usize,
 }
+impl TrampolineStackInfo {
+    pub fn allocate_map(&self, binary_interface:&mut BinaryInterface){
+        binary_interface.pin_mut().mmap_stack(self.base_addr, self.size);
+    }
+}
 /**
  * repeated sections of:
  * xchg TrampolineStackInfo.base_addr rsp
@@ -39,6 +45,11 @@ pub struct TrampolineStackInfo {
 pub struct TrampolineHeapInfo {
     pub base_addr: usize,
     pub size: usize,
+}
+impl TrampolineHeapInfo {
+    pub fn allocate_map(&self, binary_interface:&mut BinaryInterface){
+        binary_interface.pin_mut().mmap_heap(self.base_addr, self.size);
+    }
 }
 #[derive(Clone, Eq, PartialEq)]
 pub struct TrampolineInfo {
@@ -61,13 +72,13 @@ impl Default for TrampolineManager {
         TrampolineManager::new(
             TrampolineStackInfo {
                 base_addr: 0x71000000,
-                size: 0x1000000,
+                size: 0x100000,
                 reserved_space: 0x40,
             },
             TrampolineHeapInfo {
                 base_addr:0x73000000,//0x555554553000,// 0x73000000,
                 // base_addr: 0x555554553000, // 0x73000000,
-                size: 0x1000000,
+                size: 0x100000,
             },
         )
     }
@@ -83,6 +94,24 @@ impl TrampolineManager {
             recorded_addresses: Vec::new(),
             space_allocated: 0,
         }
+    }
+    pub fn new_for(bin_interface: &mut BinaryInterface, stack_info: TrampolineStackInfo, target: &Map, maps: &Lapper<usize,Map>) -> Self{
+        let heap_possible_bottom = target.ceiling - 2_usize.pow(31);
+        let heap_possible_top = target.base + 2_usize.pow(31);
+        let heap_size = 0x100000;
+        let heap_base = maps.find_free_interval(heap_possible_bottom, heap_possible_top, heap_size).unwrap();
+        let heap_info = TrampolineHeapInfo { base_addr: heap_base, size: heap_size };
+        heap_info.allocate_map(bin_interface);
+        TrampolineManager {
+            stack_info,
+            heap_info,
+            allocations: Lapper::new(vec![]),
+            trampolines: Lapper::new(vec![]),
+            unwatched_instructions: Vec::new(),
+            recorded_addresses: Vec::new(),
+            space_allocated: 0,
+        }
+
     }
     /**
      * Identify all of the jumps where we know the
@@ -132,7 +161,7 @@ impl TrampolineManager {
                         //map.insert(instr.next_ip() as usize, instr.clone());
                     } else {
                         dbg!(instr);
-                        todo!();
+                        //todo!();
                     }
                 }
                 FlowControl::IndirectCall => {
