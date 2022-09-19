@@ -1890,7 +1890,7 @@ dependencies = [
 [[package]]
 name = "procmaps"
 version = "0.4.2"
-source = "git+https://github.com/zaporter/procmaps#06230fefd903afc19e62a97ec412694d04046173"
+source = "git+https://github.com/zaporter/procmaps#848b777fd3baa421f50ce51a81cb9ad6fd4e66b1"
 dependencies = [
  "libc",
  "nom 4.2.3",

@@ -39,13 +39,13 @@ fn main() {
     //     PathBuf::from_str("/home/zack/.local/share/rr/hello_world-5").unwrap();
     // let sample_dateviewer_dir =
     //     PathBuf::from_str("/home/zack/.local/share/rr/fizzbuzz-5/").unwrap();
-    let sample_dateviewer_dir =
-        PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-104").unwrap();
+    // let sample_dateviewer_dir =
+    //     PathBuf::from_str("/home/zack/.local/share/rr/date_viewer-104").unwrap();
     // let sample_dateviewer_dir =
     //     PathBuf::from_str("/home/zack/.local/share/rr/cargo-1").unwrap();
     // let main_addr :usize = 0x558ce6f8b060;
-    // let sample_dateviewer_dir =
-    //     PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap();
+    let sample_dateviewer_dir =
+        PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap();
     let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir.clone());
 
     let rip = bin_interface
@@ -53,20 +53,20 @@ fn main() {
         .to_usize();
     dbg!(rip);
 
-    let stack_info = TrampolineStackInfo{
+    let mut stack_info = TrampolineStackInfo{
         base_addr: 0x71000000, 
-        size:0x100000,
+        size:0x10000000,
         reserved_space:0x40,
     };
-    todo!();
     stack_info.allocate_map(&mut bin_interface);
+    stack_info.setup_stack_ptr(&mut bin_interface).unwrap();
     dbg!(bin_interface.get_proc_map());
     let mut proc_map : Lapper<usize,Map>= Lapper::new(vec![]);
     for map in bin_interface.get_proc_map().unwrap().iter(){
         proc_map.insert(Interval{start:map.base, stop:map.ceiling,val:map.clone()});
     }
     // let main_executable = &proc_map.iter().find(|k| k.val.base == 93824992256000).unwrap().val;
-    let main_executable = &proc_map.iter().find(|k| k.val.base == 140737353920512).unwrap().val;
+    // let main_executable = &proc_map.iter().find(|k| k.val.base == 93824992256000).unwrap().val;
 
     let start = SystemTime::now();
 
@@ -75,21 +75,18 @@ fn main() {
     dbg!(duration);
     dbg!(code_flow.blocks.len());
     dbg!(code_flow.path.len());
-    let instructions = &read_instructions(&bin_interface, main_executable.base, main_executable.ceiling-main_executable.base);
+    // let instructions = &read_instructions(&bin_interface, main_executable.base, main_executable.ceiling-main_executable.base);
     let rip = bin_interface
         .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
         .to_usize();
     dbg!(rip);
     // build_trampoline_for_instr(&mut bin_interface, &int_instr).unwrap();
-    let mut tr = TrampolineManager::new_for(&mut bin_interface, stack_info, main_executable, &proc_map);
-    let possible_vuln_jumps = tr.identify_possible_vulnerable_jumps(instructions);
-    dbg!(possible_vuln_jumps.len());
-    tr.setup_stack_ptr(&mut bin_interface).unwrap();
-    tr.create_trampolines(&mut bin_interface, instructions, possible_vuln_jumps.into_keys().collect_vec())
-        .unwrap();
+    let mut tr = TrampolineManager::new(&mut bin_interface, stack_info,  &proc_map);
+    tr.create_trampolines(&mut bin_interface).unwrap();
+    // tr.create_trampolines(&mut bin_interface, instructions, possible_vuln_jumps.into_keys().collect_vec())
     // tr.patch_jumps_into_trampoline(&mut bin_interface, possible_vuln_jumps);
-    dbg!(tr.unwatched_instructions.len());
-    dbg!(tr.allocations.len());
+    // dbg!(tr.unwatched_instructions.len());
+    // dbg!(tr.allocations.len());
     // let code_flow = create_code_flow(&mut bin_interface).unwrap();
     // let first_block = code_flow.blocks.into_iter().next().unwrap().val;
     let step = GdbContAction {
@@ -97,18 +94,16 @@ fn main() {
         target: bin_interface.get_current_thread(),
         signal_to_deliver: 0,
     };
+    let start_continue = SystemTime::now();
     let mut num_instructions: u128 = 0;
     let mut signal = 5;
     while signal == 5 {
         num_instructions+=1;
         signal = bin_interface.pin_mut().continue_forward(step);
-        // let rip = bin_interface
-        //     .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
-        //     .to_usize();
-        // dbg!(rip);
-        // let current = get_current_instr(&bin_interface);
-        // println!("{}",current);
+        dbg!("continue");
+        break;
     }
+    dbg!(start_continue.elapsed().unwrap());
     dbg!(num_instructions);
     tr.clear_address_stack(&mut bin_interface).unwrap();
     let entries = tr.recorded_addresses();
