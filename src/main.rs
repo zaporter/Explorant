@@ -55,6 +55,7 @@ fn main() {
 
     let mut stack_info = TrampolineStackInfo{
         base_addr: 0x71000000, 
+        //size:0x40+16*100//000000,
         size:0x10000000,
         reserved_space:0x40,
     };
@@ -65,8 +66,6 @@ fn main() {
     for map in bin_interface.get_proc_map().unwrap().iter(){
         proc_map.insert(Interval{start:map.base, stop:map.ceiling,val:map.clone()});
     }
-    // let main_executable = &proc_map.iter().find(|k| k.val.base == 93824992256000).unwrap().val;
-    // let main_executable = &proc_map.iter().find(|k| k.val.base == 93824992256000).unwrap().val;
 
     let start = SystemTime::now();
 
@@ -75,20 +74,14 @@ fn main() {
     dbg!(duration);
     dbg!(code_flow.blocks.len());
     dbg!(code_flow.path.len());
-    // let instructions = &read_instructions(&bin_interface, main_executable.base, main_executable.ceiling-main_executable.base);
     let rip = bin_interface
         .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
         .to_usize();
     dbg!(rip);
-    // build_trampoline_for_instr(&mut bin_interface, &int_instr).unwrap();
     let mut tr = TrampolineManager::new(&mut bin_interface, stack_info,  &proc_map);
     tr.create_trampolines(&mut bin_interface).unwrap();
-    // tr.create_trampolines(&mut bin_interface, instructions, possible_vuln_jumps.into_keys().collect_vec())
-    // tr.patch_jumps_into_trampoline(&mut bin_interface, possible_vuln_jumps);
     // dbg!(tr.unwatched_instructions.len());
     // dbg!(tr.allocations.len());
-    // let code_flow = create_code_flow(&mut bin_interface).unwrap();
-    // let first_block = code_flow.blocks.into_iter().next().unwrap().val;
     let step = GdbContAction {
         type_: GdbActionType::ACTION_CONTINUE,
         target: bin_interface.get_current_thread(),
@@ -101,7 +94,6 @@ fn main() {
         num_instructions+=1;
         signal = bin_interface.pin_mut().continue_forward(step);
         dbg!("continue");
-        break;
     }
     dbg!(start_continue.elapsed().unwrap());
     dbg!(num_instructions);

@@ -49,6 +49,12 @@ impl TrampolineStackInfo {
         bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+1, 0x90);
         bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+2, 0x90);
         bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+3, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+4, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+5, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+6, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+7, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+8, 0x90);
+        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space+9, 0x90);
         Ok(())
     }
 }
@@ -129,7 +135,7 @@ impl TrampolineManager {
 
         let heap_possible_bottom = target.ceiling.checked_sub(2_usize.pow(31)).unwrap_or(0);
         let heap_possible_top = target.base + 2_usize.pow(31);
-        let heap_size = 0x1000000;
+        let heap_size = 0x10000000;
         let heap_base = maps
             .find_free_interval(heap_possible_bottom, heap_possible_top, heap_size)
             .unwrap();
@@ -366,53 +372,36 @@ impl TrampolineManager {
                 .pin_mut()
                 .set_byte(first_replaced_instruction_ip as usize + k, 0xcc);
         }
-        let mut skip_int3 = ca.create_label();
-        // ca.pushf()?;
+        let mut noop_to_replace = ca.create_label();
+        // SETUP
         ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
         ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
+        // RECORD DATA
         ca.mov(code_asm::rax, flow_instruction.ip())?;
         ca.push(code_asm::rax)?;
-// BEGIN FLOW PROT
-        ca.mov(code_asm::rax, 0xcccccccc_u64)?;
-        ca.push(code_asm::rax)?;
-        ca.pop(code_asm::rax)?;
+        // FLOW PROT
+        // ca.mov(code_asm::rax, 0xcccccccc_u64)?;
+        // ca.push(code_asm::rax)?;
+        // ca.pop(code_asm::rax)?;
 
-        ca.mov(code_asm::rax, code_asm::qword_ptr((stack_info.base_addr+stack_info.reserved_space) as u64))?;
-        ca.mov(code_asm::qword_ptr(skip_int3), code_asm::rax)?;
-        // ca.jmp(skip_int3);
-
-        ca.set_label(&mut skip_int3)?;
-        ca.nop()?;
-        ca.nop()?;
-        ca.nop()?;
-        ca.nop()?;
+        // ca.mov(code_asm::al, code_asm::byte_ptr(stack_info.base_addr+stack_info.reserved_space))?;
+        // ca.mov(code_asm::byte_ptr(noop_to_replace), code_asm::al)?;
+        // ca.set_label(&mut noop_to_replace)?;
         // ca.nop()?;
-        // ca.nop()?;
-        // ca.nop()?;
-// END FLOW PROT
-        // ca.mov(code_asm::rax, (stack_info.base_addr+stack_info.reserved_space) as u64)?;
-        // ca.cmp(code_asm::rsp, code_asm::rax)?;
+        // CLEANUP
         ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
         ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
-        // ca.popf()?;
         ca.jmp(replaced_instructions.last().unwrap().next_ip())?;
-        // We need to clear the stack
-        // ca.set_label(&mut skip_int3)?;
-        // // ca.int3()?;
-        // ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
-        // ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
-        // ca.popf()?;
-        // ca.jmp(replaced_instructions.last().unwrap().next_ip())?;
 
         let heap_trampoline_bytes = ca.assemble(heap_code_base_addr as u64)?;
-        heap.allocations.insert(Interval {
-            start: heap_code_base_addr,
-            stop: heap_code_base_addr + heap_trampoline_bytes.len(),
-            val: TrampolineInfo {
-                replaced_instructions,
-                trampoline_instructions: Vec::new(),
-            },
-        });
+        // heap.allocations.insert(Interval {
+        //     start: heap_code_base_addr,
+        //     stop: heap_code_base_addr + heap_trampoline_bytes.len(),
+        //     val: TrampolineInfo {
+        //         replaced_instructions,
+        //         trampoline_instructions: Vec::new(),
+        //     },
+        // });
         heap.bytes_used += heap_trampoline_bytes.len();
         bin_interface.set_bytes(heap_code_base_addr, heap_trampoline_bytes)?;
 
