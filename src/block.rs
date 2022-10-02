@@ -3,6 +3,14 @@ use std::{ops::DerefMut, rc::Rc, sync::Arc};
 use iced_x86::Instruction;
 use rust_lapper::Lapper;
 
+pub enum Fidelity {
+    // Dynamic code segment instrumentation with singlesteps
+    EveryInstruction,
+    // Use static code segment instrumentation
+    StaticHighFidelity,
+    StaticLowFidelity,
+}
+
 #[derive(Debug, Clone)]
 pub struct CodeFlow {
     pub blocks: Lapper<usize, Arc<Block>>,
@@ -30,6 +38,7 @@ pub struct Block {
     evaluations: Vec<Arc<BlockEvaluation>>,
     jumps_to: Vec<usize>,
 }
+
 impl Block {
     pub fn new(base: usize, ceiling: usize, instructions: Vec<Instruction>) -> Self {
         Block {

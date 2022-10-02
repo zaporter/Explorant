@@ -8,17 +8,21 @@ edition = "2021"
 [dependencies]
 # librr_rs = {git="https://github.com/zaporter/librr_rs"}
 librr_rs = {path="../librr_rs/"}
+druid_graphviz_layout = {path="../druid-graphviz-layout/"}
 serial_test = "0.8.0"
 rust-lapper = {git = "https://github.com/zaporter/rust-lapper"}
 rand = "0.8.5"
 gag = "1.0.0"
+similar = "2.2"
 object="0.29"
 iced-x86 = {version="1.17.0",features=["code_asm"]}
 symbolic={version="9.1",features=["demangle"]}
 symbolic-demangle={version="9.1", features=["rust", "cpp", "msvc"]}
+dot="0.1.4"
 symbolic-common={version="9.1"}
 procmaps = {git = "https://github.com/zaporter/procmaps"}
 itertools="0.10"
+env_logger="0.9"
 
 [dependencies.druid]
 version = "0.7.0"

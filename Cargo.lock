@@ -460,7 +460,10 @@ checksum = "fbdcdcb6d86f71c5e97409ad45898af11cbc995b4ee8112d59095a28d376c935"
 name = "continue_example"
 version = "0.1.0"
 dependencies = [
+ "dot",
  "druid",
+ "druid_graphviz_layout",
+ "env_logger",
  "gag",
  "iced-x86",
  "itertools 0.10.3",
@@ -470,6 +473,7 @@ dependencies = [
  "rand",
  "rust-lapper",
  "serial_test",
+ "similar",
  "symbolic",
  "symbolic-common",
  "symbolic-demangle",
@@ -640,6 +644,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0bc8fbe9441c17c9f46f75dfe27fa1ddb6c68a461ccaed0481419219d4f10d3"
 
 [[package]]
+name = "dot"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a74b6c4d4a1cff5f454164363c16b72fa12463ca6b31f4b5f2035a65fa3d5906"
+
+[[package]]
 name = "druid"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -707,6 +717,15 @@ dependencies = [
  "web-sys",
  "winapi",
  "wio",
+]
+
+[[package]]
+name = "druid_graphviz_layout"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "env_logger",
+ "log",
 ]
 
 [[package]]
@@ -2188,6 +2207,12 @@ name = "shlex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
+
+[[package]]
+name = "similar"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
 
 [[package]]
 name = "simple_logger"
