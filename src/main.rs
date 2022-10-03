@@ -23,8 +23,11 @@ mod block;
 // mod code_flow_graph;
 // mod graph_layout;
 // mod gui;
+mod recorder;
 mod lcs;
 mod trampoline;
+mod query;
+use crate::query::*;
 use crate::lcs::*;
 use crate::trampoline::*;
 
@@ -41,112 +44,25 @@ use crate::trampoline::*;
 //     Ok(to_ret)
 // }
 fn main() {
-    // let addrs_no_div = get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/a.out-31").unwrap());
-    let addrs_no_div= get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
-    // let addrs_div = get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/a.out-32").unwrap());
-    // let python = get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/node-0").unwrap());
-    let time = SystemTime::now();
-    let mut tree = BlockVocabulary::default();
-    tree.add_experience_to_vocabulary(&addrs_no_div);
-    dbg!(tree.num_words);
 
-    // tree.add_experience_to_vocabulary(&addrs_div);
-    dbg!(tree.num_words);
-    let no_div_encoded = tree.addrs_to_block_vocabulary(&addrs_no_div);
-    // let div_encoded=tree.addrs_to_block_vocabulary(&addrs_div);
-    dbg!(no_div_encoded.len());
-    // dbg!(div_encoded.len());
-    dbg!(time.elapsed().unwrap());
-    // dbg!(tree);
+    librr_rs::raise_resource_limits();
+    let output_directory = "/home/zack/dbfss";
+    let exe_path = "/home/zack/war_simulator";
+    recorder::record(exe_path,output_directory);
+    // let addrs_no_div= get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
+    // let time = SystemTime::now();
+    // let mut tree = BlockVocabulary::default();
+    // tree.add_experience_to_vocabulary(&addrs_no_div);
+    // dbg!(tree.num_words);
 
-    // let ops = capture_diff_slices(Algorithm::Myers, &addrs_no_div, &addrs_div);
-    // dbg!(ops);
+    // // tree.add_experience_to_vocabulary(&addrs_div);
+    // dbg!(tree.num_words);
+    // let no_div_encoded = tree.addrs_to_block_vocabulary(&addrs_no_div);
+    // // let div_encoded=tree.addrs_to_block_vocabulary(&addrs_div);
+    // dbg!(no_div_encoded.len());
+    // // dbg!(div_encoded.len());
+    // dbg!(time.elapsed().unwrap());
 
-    use std::borrow::Cow;
-    use std::fs;
-    use std::io::Write;
-
-    type Nd = usize;
-    type Ed = (usize, usize);
-    struct Edges(Vec<Ed>);
-
-    pub fn render_to<W: Write>(output: &mut W, edges: Vec<Ed>) {
-        let edges = Edges(edges);
-        dot::render(&edges, output).unwrap()
-    }
-
-    impl<'a> dot::Labeller<'a, Nd, Ed> for Edges {
-        fn graph_id(&'a self) -> dot::Id<'a> {
-            dot::Id::new("example1").unwrap()
-        }
-
-        fn node_id(&'a self, n: &Nd) -> dot::Id<'a> {
-            dot::Id::new(format!("N{}", *n)).unwrap()
-        }
-    }
-
-    impl<'a> dot::GraphWalk<'a, Nd, Ed> for Edges {
-        fn nodes(&self) -> dot::Nodes<'a, Nd> {
-            // (assumes that |N| \approxeq |E|)
-            let &Edges(ref v) = self;
-            let mut nodes = Vec::with_capacity(v.len());
-            for &(s, t) in v {
-                nodes.push(s);
-                nodes.push(t);
-            }
-            nodes.sort();
-            nodes.dedup();
-            Cow::Owned(nodes)
-        }
-
-        fn edges(&'a self) -> dot::Edges<'a, Ed> {
-            let &Edges(ref edges) = self;
-            Cow::Borrowed(&edges[..])
-        }
-
-        fn source(&self, e: &Ed) -> Nd {
-            e.0
-        }
-
-        fn target(&self, e: &Ed) -> Nd {
-            e.1
-        }
-    }
-    // // Create a new graph:
-    // let mut vg = VisualGraph::new(Orientation::LeftToRight);
-    fn generate_node(
-        current_addr: usize,
-        tree: &BlockVocabulary,
-        edges: &mut Vec<(usize, usize)>,
-        visited_set: &mut HashSet<usize>,
-    ) {
-        dbg!(current_addr);
-        if visited_set.contains(&current_addr) {
-            return;
-        }
-        let node = tree.map.get(&current_addr).unwrap();
-        visited_set.insert(current_addr);
-
-        for child in node.borrow().exits() {
-            edges.push((current_addr, *child));
-            generate_node(*child, tree, edges, visited_set);
-        }
-    }
-    // let mut edges = Vec::new();
-
-    // generate_node(tree.start_addr, &tree, &mut edges, &mut HashSet::new());
-
-    // use std::fs::File;
-    // let mut f = File::create("example1.dot").unwrap();
-    // render_to(&mut f,edges);
-    // for (no_div, div) in Zip::from((addrs_no_div, addrs_div)){
-    //     if no_div==div{
-    //         // println!("{}",div);
-    //     }else {
-    //         println!("{} vs {}", no_div, div);
-    //     }
-
-    // }
 }
 fn get_addrs(sample_dateviewer_dir: PathBuf) -> Vec<usize> {
     let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir.clone());
@@ -163,12 +79,14 @@ fn get_addrs(sample_dateviewer_dir: PathBuf) -> Vec<usize> {
 
     let mut stack_info = TrampolineStackInfo {
         base_addr: 0x71000000,
-        //size:0x40+16*100//000000,
-        //
         // Ive had success with 65KiB 
         // but I made it 256 MiB just in case. 
         // This shouldn't overflow
         //
+        //NOTE: 
+        //  This is consistently faster on my machine (~0.05 sec) if 
+        //  it is given 1GiB instead of 256MiB. 
+        //  I have no idea why. 
         size: 0x10000000,
         reserved_space: 0x40,
     };
