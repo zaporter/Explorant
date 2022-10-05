@@ -466,13 +466,12 @@ name = "continue_example"
 version = "0.1.0"
 dependencies = [
  "dot",
- "druid 0.7.0 (git+https://github.com/linebender/druid)",
+ "druid",
  "druid-widget-nursery",
  "druid_graphviz_layout",
  "env_logger",
  "gag",
  "iced-x86",
- "im",
  "itertools 0.10.3",
  "json5",
  "librr_rs",
@@ -688,30 +687,8 @@ version = "0.7.0"
 source = "git+https://github.com/linebender/druid?rev=fc05e965c85fced8720c655685e02478e0530e94#fc05e965c85fced8720c655685e02478e0530e94"
 dependencies = [
  "console_error_panic_hook",
- "druid-derive 0.4.0 (git+https://github.com/linebender/druid?rev=fc05e965c85fced8720c655685e02478e0530e94)",
- "druid-shell 0.7.0 (git+https://github.com/linebender/druid?rev=fc05e965c85fced8720c655685e02478e0530e94)",
- "fluent-bundle",
- "fluent-langneg",
- "fluent-syntax",
- "fnv",
- "im",
- "instant",
- "tracing",
- "tracing-subscriber",
- "tracing-wasm",
- "unic-langid",
- "unicode-segmentation",
- "xi-unicode",
-]
-
-[[package]]
-name = "druid"
-version = "0.7.0"
-source = "git+https://github.com/linebender/druid#7c08b326578aa2b25057f5f1af09f9a6b1f51da4"
-dependencies = [
- "console_error_panic_hook",
- "druid-derive 0.4.0 (git+https://github.com/linebender/druid)",
- "druid-shell 0.7.0 (git+https://github.com/linebender/druid)",
+ "druid-derive",
+ "druid-shell",
  "fluent-bundle",
  "fluent-langneg",
  "fluent-syntax",
@@ -737,52 +714,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "druid-derive"
-version = "0.4.0"
-source = "git+https://github.com/linebender/druid#7c08b326578aa2b25057f5f1af09f9a6b1f51da4"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "druid-shell"
 version = "0.7.0"
 source = "git+https://github.com/linebender/druid?rev=fc05e965c85fced8720c655685e02478e0530e94#fc05e965c85fced8720c655685e02478e0530e94"
-dependencies = [
- "anyhow",
- "bitflags",
- "block",
- "cairo-rs",
- "cfg-if",
- "cocoa",
- "core-graphics",
- "foreign-types",
- "gdk-sys",
- "glib-sys",
- "gtk",
- "gtk-sys",
- "instant",
- "js-sys",
- "keyboard-types",
- "kurbo",
- "lazy_static",
- "objc",
- "piet-common",
- "scopeguard",
- "time",
- "tracing",
- "wasm-bindgen",
- "web-sys",
- "winapi",
- "wio",
-]
-
-[[package]]
-name = "druid-shell"
-version = "0.7.0"
-source = "git+https://github.com/linebender/druid#7c08b326578aa2b25057f5f1af09f9a6b1f51da4"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -817,7 +751,7 @@ name = "druid-widget-nursery"
 version = "0.1.0"
 source = "git+https://github.com/linebender/druid-widget-nursery#50b1cd1b59573159377ed3c0a25ca80e791a7574"
 dependencies = [
- "druid 0.7.0 (git+https://github.com/linebender/druid?rev=fc05e965c85fced8720c655685e02478e0530e94)",
+ "druid",
  "log",
  "tracing",
 ]
@@ -827,7 +761,7 @@ name = "druid_graphviz_layout"
 version = "0.1.0"
 dependencies = [
  "clap",
- "druid 0.7.0 (git+https://github.com/linebender/druid)",
+ "druid",
  "env_logger",
  "log",
 ]

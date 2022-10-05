@@ -27,6 +27,10 @@ env_logger="0.9"
 serde= {version="1.0", features=["derive"]}
 json5="0.4"
 
-im="15.1"
-druid = {git="https://github.com/linebender/druid", features=["im"]}
 druid-widget-nursery = { git = "https://github.com/linebender/druid-widget-nursery" }
+
+[dependencies.druid]
+git = "https://github.com/linebender/druid"
+rev = "fc05e965c85fced8720c655685e02478e0530e94" # update this when upgrading to newer druid
+# path = "../../projects/druid/druid"
+features = ["im"]

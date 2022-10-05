@@ -32,6 +32,7 @@ use crate::query::node;
 use crate::query::QueryGraphNode;
 use crate::query::QueryGraphState;
 use crate::query::QueryNode;
+use crate::query::node::SelectedChild;
 use druid::LensExt;
 
 use druid::im::{vector, Vector};
@@ -54,15 +55,17 @@ pub fn start_query_editor() {
         start: 0,
         end: 100,
         child: None,
-        selected_child_id:None,
-        id: 0,
+        selected_child_id:SelectedChild::None,
+        id: 1,
+        ver:10,
     }));
     let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange {
         start: 0,
         end: 100,
         child: None,
-        selected_child_id:None,
-        id: 1,
+        selected_child_id:SelectedChild::None,
+        id: 2,
+        ver:10,
     }));
     let leaves = vector![k, l];
 
@@ -83,30 +86,16 @@ fn build_graph_widget() -> impl Widget<AppState> {
     GraphvizWidget::new().lens(AppState::graph.then(QueryGraphState::graph))
 }
 fn build_side_widget() -> impl Widget<AppState> {
-    let button = Button::new("Increment").on_click(|_ctx, data: &mut AppState, _env| {
+    let button = Button::new("Add Time Range").on_click(|_ctx, data: &mut AppState, _env| {
         // data.graph = create_vgd("FUCK".into());
     });
-    // Scroll::new(
-    //     List::new(|| {
-    //         Flex::column()
-    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
-    //                 format!("Type #{}", item.borrow().get_type())
-    //             }))
-    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
-    //                 format!("Id #{}", item.borrow().get_id())
-    //             }))
-    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
-    //                 format!("Id #{}", item.borrow().get_id())
-    //             }))
-    //             .border(Color::grey(0.6), 2.0)
-    //     })
-    //     .lens(AppState::graph.then(QueryGraphState::leaves)),
-    // )
-    // .border(Color::grey(0.6), 2.0)
+    Flex::column()
+        .with_child(button)
+        .with_child(
     Scroll::new(
         List::new(|| {
             ViewSwitcher::new(
-                |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.1.borrow().get_id(),
+                |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.1.borrow().get_id()*d.1.borrow().get_ver(),
                 |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
                     item.borrow().create_sideview_elem()
                 },
@@ -115,8 +104,10 @@ fn build_side_widget() -> impl Widget<AppState> {
         .lens(AppState::graph.map(
             |d: &QueryGraphState| (d.clone(), d.leaves.clone()),
             |d: &mut QueryGraphState,
-             x: (QueryGraphState, Vector<QueryGraphNode>)| { *d = x.0 },
+             x: (QueryGraphState, Vector<QueryGraphNode>)| { *d = x.0; },
         )),
     )
     .border(Color::grey(0.6), 2.0)
+
+        )
 }
