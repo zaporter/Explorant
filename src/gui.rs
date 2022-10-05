@@ -29,10 +29,11 @@ use rust_lapper::Lapper;
 use crate::block::Block;
 use crate::block::CodeFlow;
 use crate::query::node;
+use crate::query::SelectedChild;
+use crate::query::BasicNodeData;
 use crate::query::QueryGraphNode;
 use crate::query::QueryGraphState;
 use crate::query::QueryNode;
-use crate::query::node::SelectedChild;
 use druid::LensExt;
 
 use druid::im::{vector, Vector};
@@ -51,27 +52,13 @@ pub fn start_query_editor() {
         .window_size((400.0, 400.0));
 
     // let leaves : Vector<Rc<RefCell<dyn QueryNode>>>= vector![Rc::new(RefCell::new(Node::TimeRange{start:0, end:100, child:None, id:0}))];
-    let k: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange {
-        start: 0,
-        end: 100,
-        child: None,
-        selected_child_id:SelectedChild::None,
-        id: 1,
-        ver:10,
-    }));
-    let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange {
-        start: 0,
-        end: 100,
-        child: None,
-        selected_child_id:SelectedChild::None,
-        id: 2,
-        ver:10,
-    }));
-    let leaves = vector![k, l];
+    let k: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange::new(1)));
+    let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange::new(2)));
+    let leaves = vector![l, k];
 
     let initial_state = AppState {
         text: "pen".into(),
-        graph: QueryGraphState::new(leaves)
+        graph: QueryGraphState::new(leaves),
     };
     AppLauncher::with_window(main_window)
         .launch(initial_state)
@@ -87,27 +74,32 @@ fn build_graph_widget() -> impl Widget<AppState> {
 }
 fn build_side_widget() -> impl Widget<AppState> {
     let button = Button::new("Add Time Range").on_click(|_ctx, data: &mut AppState, _env| {
+        let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange::new(data.graph.last_node_id+3)));
+        data.graph.last_node_id += 1;
+        data.graph.leaves.push_back(l);
+        data.graph.ver += 1;
+        data.graph.refresh_vgd();
+
+        //     )
         // data.graph = create_vgd("FUCK".into());
     });
-    Flex::column()
-        .with_child(button)
-        .with_child(
-    Scroll::new(
-        List::new(|| {
-            ViewSwitcher::new(
-                |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.1.borrow().get_id()*d.1.borrow().get_ver(),
-                |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
-                    item.borrow().create_sideview_elem()
+    Flex::column().with_child(button).with_child(
+        Scroll::new(
+            List::new(|| {
+                ViewSwitcher::new(
+                    |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.0.ver,
+                    |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
+                        item.borrow().create_sideview_elem()
+                    },
+                )
+            })
+            .lens(AppState::graph.map(
+                |d: &QueryGraphState| (d.clone(), d.leaves.clone()),
+                |d: &mut QueryGraphState, x: (QueryGraphState, Vector<QueryGraphNode>)| {
+                    *d = x.0;
                 },
-            )
-        })
-        .lens(AppState::graph.map(
-            |d: &QueryGraphState| (d.clone(), d.leaves.clone()),
-            |d: &mut QueryGraphState,
-             x: (QueryGraphState, Vector<QueryGraphNode>)| { *d = x.0; },
-        )),
-    )
-    .border(Color::grey(0.6), 2.0)
-
+            )),
         )
+        .border(Color::grey(0.1), 2.0),
+    )
 }

@@ -72,6 +72,8 @@ pub type QueryGraphNode = Rc<RefCell<dyn QueryNode>>;
 pub struct QueryGraphState {
     pub leaves: Vector<QueryGraphNode>,
     pub graph: VisualGraphData,
+    pub last_node_id : usize,
+    pub ver : usize,
 }
 impl QueryGraphState {
     pub fn new(leaves: Vector<QueryGraphNode>) -> Self {
@@ -79,6 +81,8 @@ impl QueryGraphState {
         let mut me = Self {
             leaves,
             graph: empty_vg,
+            last_node_id:0,
+            ver:0,
         };
         me.refresh_vgd();
         me
@@ -97,9 +101,12 @@ impl QueryGraphState {
 // pub struct QueryNode {
 //     children : Vector<usize>
 // }
-pub trait QueryNode {
+pub trait BasicNodeMetadata {
     fn get_type(&self) -> QueryNodeType;
-    fn get_display_name(&self) -> String;
+    fn display_name(&self) -> String;
+    fn num_children(&self) -> usize;
+    fn basic(&self)-> &BasicNodeData;
+    fn basic_mut(&mut self)->&mut BasicNodeData;
     fn run(
         &mut self,
         config: QueryConfig,
@@ -110,27 +117,34 @@ pub trait QueryNode {
         state: &mut VisualGraphData,
         parent_handle: Option<NodeHandle>,
     );
-    fn create_sideview_elem(&self) -> Box<dyn Widget<(QueryGraphState, QueryGraphNode)>>;
+}
+
+#[derive(Clone, Data, PartialEq, PartialOrd, Ord, Eq, Debug)]
+pub enum SelectedChild {
+    Some(usize),
+    None,
+}
+#[derive(Clone, Data, Default)]
+pub struct BasicNodeData {
+    pub selected_child_ids: Vector<SelectedChild>,
+    pub children: Vector<Option<QueryGraphNode>>,
+    pub id: usize,
+}
+pub trait BasicNodeFunctionality : BasicNodeMetadata{
     fn contains_node(&self, check_id:usize)->bool;
     fn get_id(&self) -> usize;
-    fn get_ver(&self) -> usize;
-    fn inc_ver(&mut self);
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+}
+pub trait QueryNode : BasicNodeMetadata + BasicNodeFunctionality{
+    fn create_sideview_elem(&self) -> Box<dyn Widget<(QueryGraphState, QueryGraphNode)>>;
 }
 
 pub mod node {
 
-    #[derive(Clone, Data, PartialEq, PartialOrd, Ord, Eq, Debug)]
-    pub enum SelectedChild {
-        Some(usize),
-        None,
-    }
-
-
     use druid::{
         lens,
-        widget::{Button, Flex, Label, ViewSwitcher, Either},
+        widget::{Button, Flex, Label, ViewSwitcher, Either, List},
         LensExt, Color,
     };
     use druid_graphviz_layout::{
@@ -143,23 +157,42 @@ pub mod node {
 
     use super::*;
 
+
     #[derive(Clone, Data, Lens)]
     pub struct TimeRange {
         pub start: usize,
         pub end: usize,
-        pub selected_child_id: SelectedChild,
-        pub child: Option<QueryGraphNode>,
-        pub id: usize,
-        pub ver: usize,
+        basic : BasicNodeData,
     }
-    impl QueryNode for TimeRange {
+    impl TimeRange {
+        pub fn new(id:usize)->Self{
+            let mut me =Self{
+                start:0,
+                end:0,
+                basic: BasicNodeData::default(),
+            };
+            me.basic.id = id;
+            for _ in 0..me.num_children() {
+                me.basic.children.push_front(None);
+                me.basic.selected_child_ids.push_front(SelectedChild::None);
+            }
+            me
+        }
+
+    }
+    impl BasicNodeMetadata for TimeRange {
         fn get_type(&self) -> QueryNodeType {
             QueryNodeType::Filter
         }
 
-        fn get_display_name(&self) -> String {
+        fn display_name(&self) -> String {
             "Time Range".to_string()
         }
+
+        fn num_children(&self) -> usize{2}
+        fn basic(&self)-> &BasicNodeData{&self.basic}
+        fn basic_mut(&mut self)-> &mut BasicNodeData{&mut self.basic}
+        
         fn run(
             &mut self,
             mut config: QueryConfig,
@@ -167,7 +200,7 @@ pub mod node {
         ) -> Result<Box<dyn QueryResult>, Box<dyn Error>> {
             config.frame_time_range.0 = self.start;
             config.frame_time_range.1 = self.end;
-            self.child
+            self.basic().children.get(0).unwrap()
                 .as_ref()
                 .expect("No child for component to run")
                 .borrow_mut()
@@ -179,80 +212,121 @@ pub mod node {
             state: &mut VisualGraphData,
             parent_handle: Option<NodeHandle>,
         ) {
-            let sp0 = ShapeKind::new_box(&format!("id: {}", self.get_id()));
-            let look0 = StyleAttr::simple();
+            let shape = ShapeKind::new_box(&format!("id: {}", self.get_id()));
+            let look = StyleAttr::simple();
             let sz = druid_graphviz_layout::core::geometry::Point::new(100., 100.);
-            let node0 = Element::create(sp0, look0, Orientation::LeftToRight, sz);
+            let node = Element::create(shape, look, Orientation::LeftToRight, sz);
 
-            let self_handle = state.graph.borrow_mut().add_node(node0);
+            let self_handle = state.graph.borrow_mut().add_node(node);
 
             if let Some(parent_handle) = parent_handle {
-                let arrow = druid_graphviz_layout::std_shapes::shapes::Arrow::simple("123");
+                let arrow = druid_graphviz_layout::std_shapes::shapes::Arrow::simple("");
                 state
                     .graph
                     .borrow_mut()
                     .add_edge(arrow, parent_handle, self_handle);
             }
-            if let Some(child) = &self.child {
+            if let Some(child) = &self.basic().children[0] {
+                child
+                    .borrow()
+                    .add_self_to_visualgraph(state, Some(self_handle));
+            }
+            if let Some(child) = &self.basic().children[1] {
                 child
                     .borrow()
                     .add_self_to_visualgraph(state, Some(self_handle));
             }
         }
 
+    }
+    impl<T> BasicNodeFunctionality for T 
+    where 
+        T: BasicNodeMetadata + 'static
+    {
+        fn contains_node(&self, check_id:usize)->bool{
+            for child in self.basic().children.iter() {
+                if let Some(child) = &child {
+                    if child.borrow().get_id() == check_id || child.borrow().contains_node(check_id){
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        fn get_id(&self) -> usize {
+            self.basic().id
+        }
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+    impl<T> QueryNode for T 
+    where 
+        T: BasicNodeFunctionality+ BasicNodeMetadata + Data+ 'static
+    {
+
         fn create_sideview_elem(&self) -> Box<dyn Widget<(QueryGraphState, QueryGraphNode)>> {
             Box::new(
                 Flex::column()
                     .with_child(Label::new(
-                        |(_, item): &(QueryGraphState, TimeRange), _env: &_| {
-                            format!("{} :#{}",item.get_display_name(), item.get_id())
+                        |(_, item): &(QueryGraphState, T), _env: &_| {
+                            format!("{} :#{}",item.display_name(), item.get_id())
                         },
                     ))
                     // .with_child(button)
-                    .with_child(Label::new("Child:"))
-                    .with_child(ViewSwitcher::new(
-                        |d: &(QueryGraphState, TimeRange), _env: &_| d.1.get_id() * d.1.get_ver(),
-                        |selector, (shared, item): &(QueryGraphState, TimeRange), _env| {
-                            let mut elems = vec![("None".to_owned(), SelectedChild::None)];
+                    .with_child(List::new(||{
+                        Flex::column()
+                        .with_child(Label::new("Child:"))
 
-                            for k in shared.leaves.iter() {
-                                // Dont include my parent as an option
-                                if k.borrow().contains_node(item.get_id()){
-                                    continue;
-                                }
-                                let other_id = k.borrow().get_id();
-                                if other_id != item.get_id() {
-                                    elems.push((
-                                        format!("#{}", other_id),
-                                        SelectedChild::Some(other_id),
-                                    ));
-                                }
-                            }
-                            if let Some(child) = &item.child {
+                    .with_child(ViewSwitcher::new(
+                        |d: &(QueryGraphState, (T,usize)), _env: &_| d.0.ver,
+                        |selector, (shared, (item,index)): &(QueryGraphState, (T,usize)), _env| {
+                            let mut elems = vec![("None".to_owned(), SelectedChild::None)];
+                            
+                            if let Some(child) = &item.basic().children[*index] {
                                 let child_id = child.borrow().get_id();
                                 elems.push((
                                     format!("#{}", child_id),
                                     SelectedChild::Some(child_id),
                                 ));
+                            }else {
+                                for k in shared.leaves.iter() {
+                                    // Dont include my parent as an option
+                                    if k.borrow().contains_node(item.get_id()){
+                                        continue;
+                                    }
+                                    let other_id = k.borrow().get_id();
+                                    if other_id != item.get_id() {
+                                        elems.push((
+                                            format!("#{}", other_id),
+                                            SelectedChild::Some(other_id),
+                                        ));
+                                    }
+                                }
+
                             }
                             Box::new(ListSelect::new(elems).lens(lens::Field::new(
-                                |(_, item): &(QueryGraphState, TimeRange)| &item.selected_child_id,
-                                |(_, item)| &mut item.selected_child_id,
+                                |(_, (item,index)): &(QueryGraphState, (T,usize))| &item.basic().selected_child_ids[*index],
+                                |(_, (item,index))| &mut item.basic_mut().selected_child_ids[*index],
                             )))
                         },
                     ))
-                    .with_child(ViewSwitcher::new(|d:&(QueryGraphState,TimeRange),_env:&_|d.1.child.is_some(),
-                    |selector, (shared_outer,item_outer): &(QueryGraphState, TimeRange), _env| {
-                        if item_outer.child.is_some() {
+
+                    .with_child(ViewSwitcher::new(|d:&(QueryGraphState,(T,usize)),_env:&_|d.1.0.basic().children[d.1.1].is_some(),
+                    |selector, (shared_outer,(item_outer,child_index)): &(QueryGraphState, (T,usize)), _env| {
+                        if item_outer.basic().children[*child_index].is_some() {
                             Box::new(
                                 ViewSwitcher::new(
-                                    |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.1.borrow().get_id() * d.1.borrow().get_ver(),
+                                    |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.0.ver,
                                     |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
                                             item.borrow().create_sideview_elem()
                                     },
                                 ).lens(lens::Identity.map(
-                                    |d: &(QueryGraphState, TimeRange)| {(d.0.clone(), d.1.child.clone().unwrap())},
-                                    |d: &mut (QueryGraphState, TimeRange), x: (QueryGraphState, QueryGraphNode)| {
+                                    |d: &(QueryGraphState, (T,usize))| {(d.0.clone(), d.1.0.basic().children[d.1.1].clone().unwrap())},
+                                    |d: &mut (QueryGraphState, (T,usize)), x: (QueryGraphState, QueryGraphNode)| {
                                         d.0 = x.0;
                                         
                                     }
@@ -260,10 +334,30 @@ pub mod node {
                                 )
                         }else {
                             Box::new(Label::new("No Child"))
-
                         }
 
                     }))
+
+                    })
+                        .lens(lens::Identity.map(
+
+                                |d: &(QueryGraphState, T)| {
+                                    let mut res = Vector::new();
+                                    for i in 0..d.1.num_children() {
+                                        res.push_back((d.1.clone(), i));
+                                    }
+                                    (d.0.clone(), res)
+                                }, 
+                                |d: &mut (QueryGraphState, T), x:(QueryGraphState,Vector<(T, usize)>)| {
+
+                                    d.0 = x.0;
+                                    for i in 0..d.1.num_children() {
+                                        d.1.basic_mut().children[i] = x.1[i].0.basic().children[i].clone();
+                                        d.1.basic_mut().selected_child_ids[i] = x.1[i].0.basic().selected_child_ids[i].clone();
+                                    }
+
+                                })) 
+                    )
                     .border(Color::grey(0.6),2.0)
                     .rounded(5.0)
                     .lens(lens::Identity.map(
@@ -272,17 +366,17 @@ pub mod node {
                                 d.0.clone(),
                                 d.1.borrow_mut()
                                     .as_any()
-                                    .downcast_ref::<TimeRange>()
+                                    .downcast_ref::<T>()
                                     .expect("WFT")
                                     .clone(),
                             )
                         },
                         |d: &mut (QueryGraphState, QueryGraphNode),
-                         mut x: (QueryGraphState, TimeRange)| {
+                         mut x: (QueryGraphState, T)| {
                             d.0 = x.0;
-
-                            if let SelectedChild::Some(child_id) = x.1.selected_child_id {
-                                if x.1.child.is_none() {
+                        for child_index in 0..d.1.borrow().num_children(){
+                            if let SelectedChild::Some(child_id) = x.1.basic().selected_child_ids[child_index] {
+                                if x.1.basic().children[child_index].is_none() {
                                     let mut item_index = None;
                                     for (i, leaf) in d.0.leaves.iter().enumerate() {
                                         if leaf.borrow().get_id() == child_id {
@@ -295,24 +389,23 @@ pub mod node {
                                         item_index
                                             .expect("Unable to find element to make my child"),
                                     );
-                                    new_child.borrow_mut().inc_ver();
-                                    x.1.child = Some(new_child);
-                                    x.1.inc_ver();
+                                    x.1.basic_mut().children[child_index] = Some(new_child);
+                                    d.0.ver+=1;
                                 }
                             }
-                            if let SelectedChild::None = x.1.selected_child_id {
-                                if x.1.child.is_some() {
-                                    let child = x.1.child.unwrap();
-                                    child.borrow_mut().inc_ver();
-                                    d.0.leaves.push_front(child.clone());
-                                    x.1.child = None;
-                                    x.1.inc_ver();
+                            if let SelectedChild::None = x.1.basic().selected_child_ids[child_index] {
+                                if x.1.basic().children[child_index].is_some() {
+                                    let child = x.1.basic_mut().children[child_index].as_mut().unwrap();
+                                    d.0.leaves.push_back(child.clone());
+                                    x.1.basic_mut().children[child_index] = None;
+                                    d.0.ver+=1;
                                 }
                             }
+                         }
                             {
                                 let mut me = d.1.borrow_mut();
-                                let real: &mut TimeRange =
-                                    me.as_any_mut().downcast_mut::<TimeRange>().unwrap();
+                                let real: &mut T =
+                                    me.as_any_mut().downcast_mut::<T>().unwrap();
                                 *real = x.1;
                             }
                             d.0.refresh_vgd();
@@ -322,30 +415,5 @@ pub mod node {
         }
 
 
-        fn contains_node(&self, check_id:usize)->bool{
-
-            if let Some(child) = &self.child {
-                if child.borrow().get_id() == check_id {
-                    return true;
-                }else {
-                    return child.borrow().contains_node(check_id);
-                }
-            }else {return false;}
-        }
-        fn get_id(&self) -> usize {
-            self.id
-        }
-        fn get_ver(&self) -> usize {
-            self.ver
-        }
-        fn inc_ver(&mut self) {
-            self.ver += 1;
-        }
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
     }
 }
