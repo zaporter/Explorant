@@ -22,7 +22,7 @@ use crate::block::{Block, BlockEvaluation, CodeFlow};
 mod block;
 // mod code_flow_graph;
 // mod graph_layout;
-// mod gui;
+mod gui;
 mod recorder;
 mod lcs;
 mod trampoline;
@@ -46,9 +46,10 @@ use crate::trampoline::*;
 fn main() {
 
     librr_rs::raise_resource_limits();
-    let output_directory = "/home/zack/dbfss";
-    let exe_path = "/home/zack/war_simulator";
-    recorder::record(exe_path,output_directory);
+    gui::start_query_editor();
+    // let output_directory = "/home/zack/dbfss";
+    // let exe_path = "/home/zack/war_simulator";
+    // recorder::record(exe_path,output_directory);
     // let addrs_no_div= get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
     // let time = SystemTime::now();
     // let mut tree = BlockVocabulary::default();

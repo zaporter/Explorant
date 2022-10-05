@@ -46,7 +46,6 @@ use crate::{
 pub struct CodeFlowState {
     pub graph_layout: Arc<GraphLayout>,
     pub center: Vec2,
-    
     pub zoom: f64,
     pub mouse_down_last: Option<Vec2>
 }

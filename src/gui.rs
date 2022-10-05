@@ -1,47 +1,122 @@
-
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
-use druid::Vec2;
+use druid::lens;
 use druid::widget::prelude::*;
+use druid::widget::Button;
+use druid::widget::Either;
+use druid::widget::List;
+use druid::widget::Scroll;
 use druid::widget::SizedBox;
+use druid::widget::Split;
+use druid::widget::ViewSwitcher;
 use druid::widget::{Align, Flex, Label, TextBox};
+use druid::Color;
+use druid::UnitPoint;
+use druid::Vec2;
 use druid::{AppLauncher, Data, Env, Lens, LocalizedString, Widget, WidgetExt, WindowDesc};
 use druid::{KeyOrValue, Point, Rect, WidgetPod};
+use druid_graphviz_layout::backends::druid::GraphvizWidget;
+use druid_graphviz_layout::backends::druid::VisualGraphData;
+use druid_graphviz_layout::core::base::Orientation;
+use druid_graphviz_layout::core::style::StyleAttr;
+use druid_graphviz_layout::std_shapes::shapes::Element;
+use druid_graphviz_layout::std_shapes::shapes::ShapeKind;
+use druid_graphviz_layout::topo::layout::VisualGraph;
 use rust_lapper::Lapper;
 
 use crate::block::Block;
 use crate::block::CodeFlow;
-use crate::code_flow_graph::*;
-use crate::graph_layout::GraphLayout;
+use crate::query::node;
+use crate::query::QueryGraphNode;
+use crate::query::QueryGraphState;
+use crate::query::QueryNode;
+use druid::LensExt;
 
-const WINDOW_TITLE: LocalizedString<CodeFlowState> = LocalizedString::new("Code Flow Graph Examiner");
+use druid::im::{vector, Vector};
+// use crate::code_flow_graph::*;
+// use crate::graph_layout::GraphLayout;
 
 #[derive(Clone, Data, Lens)]
-struct BlockState {
-    block : Arc<Block>,
+struct AppState {
+    text: String,
+    graph: QueryGraphState,
 }
 
-pub fn start_code_flow_examiner(code_flow : CodeFlow) {
-    let main_window = WindowDesc::new(build_root_widget)
-        .title(WINDOW_TITLE)
+pub fn start_query_editor() {
+    let main_window = WindowDesc::new(build_root_widget())
+        .title("Streeling University Library Terminal")
         .window_size((400.0, 400.0));
 
+    // let leaves : Vector<Rc<RefCell<dyn QueryNode>>>= vector![Rc::new(RefCell::new(Node::TimeRange{start:0, end:100, child:None, id:0}))];
+    let k: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange {
+        start: 0,
+        end: 100,
+        child: None,
+        selected_child_id:None,
+        id: 0,
+    }));
+    let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange {
+        start: 0,
+        end: 100,
+        child: None,
+        selected_child_id:None,
+        id: 1,
+    }));
+    let leaves = vector![k, l];
 
-    let initial_state = CodeFlowState {
-        graph_layout: Arc::new(GraphLayout::new(code_flow)),
-        center: Vec2::default(),
-        zoom: 1.,
-        mouse_down_last:None,
+    let initial_state = AppState {
+        text: "pen".into(),
+        graph: QueryGraphState::new(leaves)
     };
-
     AppLauncher::with_window(main_window)
         .launch(initial_state)
         .expect("Failed to launch application");
 }
 
-
-fn build_root_widget() -> CodeFlowGraph{
-    let label = CodeFlowGraph::new();
-   label
+fn build_root_widget() -> impl Widget<AppState> {
+    Split::columns(build_graph_widget(), build_side_widget()).split_point(0.75)
 }
 
+fn build_graph_widget() -> impl Widget<AppState> {
+    GraphvizWidget::new().lens(AppState::graph.then(QueryGraphState::graph))
+}
+fn build_side_widget() -> impl Widget<AppState> {
+    let button = Button::new("Increment").on_click(|_ctx, data: &mut AppState, _env| {
+        // data.graph = create_vgd("FUCK".into());
+    });
+    // Scroll::new(
+    //     List::new(|| {
+    //         Flex::column()
+    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
+    //                 format!("Type #{}", item.borrow().get_type())
+    //             }))
+    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
+    //                 format!("Id #{}", item.borrow().get_id())
+    //             }))
+    //             .with_child(Label::new(|item: &QueryGraphNode, _env: &_| {
+    //                 format!("Id #{}", item.borrow().get_id())
+    //             }))
+    //             .border(Color::grey(0.6), 2.0)
+    //     })
+    //     .lens(AppState::graph.then(QueryGraphState::leaves)),
+    // )
+    // .border(Color::grey(0.6), 2.0)
+    Scroll::new(
+        List::new(|| {
+            ViewSwitcher::new(
+                |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.1.borrow().get_id(),
+                |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
+                    item.borrow().create_sideview_elem()
+                },
+            )
+        })
+        .lens(AppState::graph.map(
+            |d: &QueryGraphState| (d.clone(), d.leaves.clone()),
+            |d: &mut QueryGraphState,
+             x: (QueryGraphState, Vector<QueryGraphNode>)| { *d = x.0 },
+        )),
+    )
+    .border(Color::grey(0.6), 2.0)
+}
