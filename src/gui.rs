@@ -73,7 +73,7 @@ fn build_graph_widget() -> impl Widget<AppState> {
     GraphvizWidget::new().lens(AppState::graph.then(QueryGraphState::graph))
 }
 fn build_side_widget() -> impl Widget<AppState> {
-    let button = Button::new("Add Time Range").on_click(|_ctx, data: &mut AppState, _env| {
+    let add_time_range = Button::new("Add Time Range").on_click(|_ctx, data: &mut AppState, _env| {
         let l: QueryGraphNode = Rc::new(RefCell::new(node::TimeRange::new(
             data.graph.last_node_id + 3,
         )));
@@ -81,13 +81,30 @@ fn build_side_widget() -> impl Widget<AppState> {
         data.graph.leaves.push_back(l);
         data.graph.ver += 1;
         data.graph.refresh_vgd();
-
-        //     )
-        // data.graph = create_vgd("FUCK".into());
+    });
+    let add_recording = Button::new("Add Recording").on_click(|_ctx, data: &mut AppState, _env| {
+        let l: QueryGraphNode = Rc::new(RefCell::new(node::Recording::new(
+            data.graph.last_node_id + 3,
+        )));
+        data.graph.last_node_id += 1;
+        data.graph.leaves.push_back(l);
+        data.graph.ver += 1;
+        data.graph.refresh_vgd();
+    });
+    let add_xor = Button::new("Add Xor").on_click(|_ctx, data: &mut AppState, _env| {
+        let l: QueryGraphNode = Rc::new(RefCell::new(node::Xor::new(
+            data.graph.last_node_id + 3,
+        )));
+        data.graph.last_node_id += 1;
+        data.graph.leaves.push_back(l);
+        data.graph.ver += 1;
+        data.graph.refresh_vgd();
     });
     Scroll::new(
         Flex::column()
-            .with_child(button)
+            .with_child(add_recording)
+            .with_child(add_time_range)
+            .with_child(add_xor)
             .with_child(
                 List::new(|| {
                     ViewSwitcher::new(

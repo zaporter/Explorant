@@ -95,12 +95,6 @@ impl QueryGraphState {
         self.graph = vg;
     }
 }
-// pub struct NodeParameter{
-
-// }
-// pub struct QueryNode {
-//     children : Vector<usize>
-// }
 pub trait BasicNodeMetadata {
     fn get_type(&self) -> QueryNodeType;
     fn display_name(&self) -> String;
@@ -117,7 +111,7 @@ pub trait BasicNodeMetadata {
         state: &mut VisualGraphData,
         parent_handle: Option<NodeHandle>,
     );
-    fn create_self_test(&self)->Box<dyn Widget<QueryGraphNode>>;
+    fn create_sideview_component_config(&self)->Box<dyn Widget<(QueryGraphState,QueryGraphNode)>>;
 }
 
 #[derive(Clone, Data, PartialEq, PartialOrd, Ord, Eq, Debug)]
@@ -145,8 +139,8 @@ pub mod node {
 
     use druid::{
         lens,
-        widget::{Button, Flex, Label, ViewSwitcher, Either, List},
-        LensExt, Color,
+        widget::{Button, Flex, Label, ViewSwitcher, Either, List, TextBox, ValueTextBox},
+        LensExt, Color, text::{Formatter, ParseFormatter},
     };
     use druid_graphviz_layout::{
         core::{base::Orientation, style::StyleAttr},
@@ -179,7 +173,6 @@ pub mod node {
             }
             me
         }
-
     }
     impl BasicNodeMetadata for TimeRange {
         fn get_type(&self) -> QueryNodeType {
@@ -190,7 +183,7 @@ pub mod node {
             "Time Range".to_string()
         }
 
-        fn num_children(&self) -> usize{2}
+        fn num_children(&self) -> usize{1}
         fn basic(&self)-> &BasicNodeData{&self.basic}
         fn basic_mut(&mut self)-> &mut BasicNodeData{&mut self.basic}
         
@@ -213,10 +206,10 @@ pub mod node {
             state: &mut VisualGraphData,
             parent_handle: Option<NodeHandle>,
         ) {
-            let shape = ShapeKind::new_box(&format!("id: {}", self.get_id()));
+            let shape = ShapeKind::new_box(&format!("{}: {}", self.display_name(),self.get_id()));
             let look = StyleAttr::simple();
             let sz = druid_graphviz_layout::core::geometry::Point::new(100., 100.);
-            let node = Element::create(shape, look, Orientation::LeftToRight, sz);
+            let node = Element::create(shape, look, Orientation::TopToBottom, sz);
 
             let self_handle = state.graph.borrow_mut().add_node(node);
 
@@ -227,19 +220,236 @@ pub mod node {
                     .borrow_mut()
                     .add_edge(arrow, parent_handle, self_handle);
             }
-            if let Some(child) = &self.basic().children[0] {
-                child
-                    .borrow()
-                    .add_self_to_visualgraph(state, Some(self_handle));
-            }
-            if let Some(child) = &self.basic().children[1] {
-                child
-                    .borrow()
-                    .add_self_to_visualgraph(state, Some(self_handle));
+            for i in 0..self.num_children() {
+                if let Some(child) = &self.basic().children[i] {
+                    child
+                        .borrow()
+                        .add_self_to_visualgraph(state, Some(self_handle));
+                }
             }
         }
-        fn create_self_test(&self)->Box<dyn Widget<QueryGraphNode>> {
-            Box::new(Label::new("TEST DATA"))
+        fn create_sideview_component_config(&self)->Box<dyn Widget<(QueryGraphState,QueryGraphNode)>> {
+
+            Box::new(Flex::row()
+                .must_fill_main_axis(true)
+                .with_child(Label::new("Params:"))
+                .with_child(Label::new("Start:"))
+                .with_child(ValueTextBox::new(TextBox::new(),ParseFormatter::new()).lens(TimeRange::start))
+                .with_child(Label::new("End:"))
+                .with_child(ValueTextBox::new(TextBox::new(),ParseFormatter::new()).lens(TimeRange::end))
+                
+                    .lens(lens::Identity.map(
+                        |d: &(QueryGraphState, QueryGraphNode)| {
+                                d.1.borrow_mut()
+                                    .as_any()
+                                    .downcast_ref::<TimeRange>()
+                                    .expect("WFT")
+                                    .clone()
+                        },
+                        |d: &mut (QueryGraphState, QueryGraphNode),
+                         mut x: TimeRange| {
+                            let mut me = d.1.borrow_mut();
+                            let real: &mut TimeRange =
+                                me.as_any_mut().downcast_mut::<TimeRange>().unwrap();
+                            *real = x;
+
+                         }
+                    )
+
+                )
+            )
+
+        }
+    }
+    #[derive(Clone, Data, Lens)]
+    pub struct Xor {
+        basic : BasicNodeData,
+    }
+    impl Xor {
+        pub fn new(id:usize)->Self{
+            let mut me =Self{
+                basic: BasicNodeData::default(),
+            };
+            me.basic.id = id;
+            for _ in 0..me.num_children() {
+                me.basic.children.push_front(None);
+                me.basic.selected_child_ids.push_front(SelectedChild::None);
+            }
+            me
+        }
+    }
+    impl BasicNodeMetadata for Xor {
+        fn get_type(&self) -> QueryNodeType {
+            QueryNodeType::Filter
+        }
+
+        fn display_name(&self) -> String {
+            "Xor".to_string()
+        }
+
+        fn num_children(&self) -> usize{2}
+        fn basic(&self)-> &BasicNodeData{&self.basic}
+        fn basic_mut(&mut self)-> &mut BasicNodeData{&mut self.basic}
+        
+        fn run(
+            &mut self,
+            mut config: QueryConfig,
+            query_executor: Box<dyn Fn(QueryConfig) -> Box<dyn QueryResult>>,
+        ) -> Result<Box<dyn QueryResult>, Box<dyn Error>> {
+            todo!()
+        }
+
+        fn add_self_to_visualgraph(
+            &self,
+            state: &mut VisualGraphData,
+            parent_handle: Option<NodeHandle>,
+        ) {
+            let shape = ShapeKind::new_box(&format!("{}: {}", self.display_name(),self.get_id()));
+            let look = StyleAttr::simple();
+            let sz = druid_graphviz_layout::core::geometry::Point::new(100., 50.);
+            let node = Element::create(shape, look, Orientation::TopToBottom, sz);
+
+            let self_handle = state.graph.borrow_mut().add_node(node);
+
+            if let Some(parent_handle) = parent_handle {
+                let arrow = druid_graphviz_layout::std_shapes::shapes::Arrow::simple("");
+                state
+                    .graph
+                    .borrow_mut()
+                    .add_edge(arrow, parent_handle, self_handle);
+            }
+            for i in 0..self.num_children() {
+                if let Some(child) = &self.basic().children[i] {
+                    child
+                        .borrow()
+                        .add_self_to_visualgraph(state, Some(self_handle));
+                }
+            }
+        }
+        fn create_sideview_component_config(&self)->Box<dyn Widget<(QueryGraphState,QueryGraphNode)>> {
+
+            Box::new(Flex::row()
+                .must_fill_main_axis(true)
+                
+                    .lens(lens::Identity.map(
+                        |d: &(QueryGraphState, QueryGraphNode)| {
+                                d.1.borrow_mut()
+                                    .as_any()
+                                    .downcast_ref::<Xor>()
+                                    .expect("WFT")
+                                    .clone()
+                        },
+                        |d: &mut (QueryGraphState, QueryGraphNode),
+                         mut x: Xor| {
+                            let mut me = d.1.borrow_mut();
+                            let real: &mut Xor =
+                                me.as_any_mut().downcast_mut::<Xor>().unwrap();
+                            *real = x;
+
+                         }
+                    )
+
+                )
+            )
+
+        }
+    }
+
+    #[derive(Clone, Data, Lens)]
+    pub struct Recording {
+        pub path: String,
+        basic : BasicNodeData,
+    }
+    impl Recording {
+        pub fn new(id:usize)->Self{
+            let mut me =Self{
+                path:String::new(),
+                basic: BasicNodeData::default(),
+            };
+            me.basic.id = id;
+            for _ in 0..me.num_children() {
+                me.basic.children.push_front(None);
+                me.basic.selected_child_ids.push_front(SelectedChild::None);
+            }
+            me
+        }
+    }
+    impl BasicNodeMetadata for Recording {
+        fn get_type(&self) -> QueryNodeType {
+            QueryNodeType::Filter
+        }
+
+        fn display_name(&self) -> String {
+            "Recording".to_string()
+        }
+
+        fn num_children(&self) -> usize{0}
+        fn basic(&self)-> &BasicNodeData{&self.basic}
+        fn basic_mut(&mut self)-> &mut BasicNodeData{&mut self.basic}
+        
+        fn run(
+            &mut self,
+            mut config: QueryConfig,
+            query_executor: Box<dyn Fn(QueryConfig) -> Box<dyn QueryResult>>,
+        ) -> Result<Box<dyn QueryResult>, Box<dyn Error>> {
+            todo!()
+        }
+
+        fn add_self_to_visualgraph(
+            &self,
+            state: &mut VisualGraphData,
+            parent_handle: Option<NodeHandle>,
+        ) {
+            let shape = ShapeKind::new_circle(&format!("{}", self.path));
+            let look = StyleAttr::simple();
+            let sz = druid_graphviz_layout::core::geometry::Point::new(50., 20.);
+            let node = Element::create(shape, look, Orientation::TopToBottom, sz);
+
+            let self_handle = state.graph.borrow_mut().add_node(node);
+
+            if let Some(parent_handle) = parent_handle {
+                let arrow = druid_graphviz_layout::std_shapes::shapes::Arrow::simple("");
+                state
+                    .graph
+                    .borrow_mut()
+                    .add_edge(arrow, parent_handle, self_handle);
+            }
+            for i in 0..self.num_children() {
+                if let Some(child) = &self.basic().children[i] {
+                    child
+                        .borrow()
+                        .add_self_to_visualgraph(state, Some(self_handle));
+                }
+            }
+        }
+        fn create_sideview_component_config(&self)->Box<dyn Widget<(QueryGraphState,QueryGraphNode)>> {
+
+            Box::new(Flex::row()
+                .must_fill_main_axis(true)
+                .with_child(Label::new("Params:"))
+                .with_child(Label::new("Path:"))
+                .with_child(ValueTextBox::new(TextBox::new(),ParseFormatter::new()).lens(Recording::path))
+                
+                    .lens(lens::Identity.map(
+                        |d: &(QueryGraphState, QueryGraphNode)| {
+                                d.1.borrow_mut()
+                                    .as_any()
+                                    .downcast_ref::<Recording>()
+                                    .expect("WFT")
+                                    .clone()
+                        },
+                        |d: &mut (QueryGraphState, QueryGraphNode),
+                         mut x: Recording| {
+                            let mut me = d.1.borrow_mut();
+                            let real: &mut Recording =
+                                me.as_any_mut().downcast_mut::<Recording>().unwrap();
+                            *real = x;
+
+                         }
+                    )
+
+                )
+            )
 
         }
 
@@ -282,10 +492,22 @@ pub mod node {
                             format!("{} :#{}",item.display_name(), item.get_id())
                         },
                     ))
+                    .with_child(
+
+                    ViewSwitcher::new(
+                        |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.0.ver,
+                        |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
+                            item.borrow().create_sideview_component_config()
+                        },
+                    )
+                        )
+
                     // .with_child(button)
                     .with_child(List::new(||{
-                        Flex::column()
+                        Flex::row()
+                            .must_fill_main_axis(true)
                         .with_child(Label::new("Child:"))
+                        .with_default_spacer()
 
                         .with_child(ViewSwitcher::new(
                             |d: &(QueryGraphState, (T,usize)), _env: &_| d.0.ver,
@@ -320,7 +542,7 @@ pub mod node {
                                 )))
                             },
                         ))
-
+                        .with_default_spacer()
                         .with_child(ViewSwitcher::new(|d:&(QueryGraphState,(T,usize)),_env:&_|d.1.0.basic().children[d.1.1].is_some(),
                         |selector, (shared_outer,(item_outer,child_index)): &(QueryGraphState, (T,usize)), _env| {
                             if item_outer.basic().children[*child_index].is_some() {
@@ -396,12 +618,6 @@ pub mod node {
                                             }
                                         }
                                     }
-                                        // {
-                                        //     let mut me = d.1.borrow_mut();
-                                        //     let real: &mut T =
-                                        //         me.as_any_mut().downcast_mut::<T>().unwrap();
-                                        //     *real = x.1;
-                                        // }
                                         d.0.refresh_vgd();
                         }
                         )
