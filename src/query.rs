@@ -117,6 +117,7 @@ pub trait BasicNodeMetadata {
         state: &mut VisualGraphData,
         parent_handle: Option<NodeHandle>,
     );
+    fn create_self_test(&self)->Box<dyn Widget<QueryGraphNode>>;
 }
 
 #[derive(Clone, Data, PartialEq, PartialOrd, Ord, Eq, Debug)]
@@ -237,6 +238,10 @@ pub mod node {
                     .add_self_to_visualgraph(state, Some(self_handle));
             }
         }
+        fn create_self_test(&self)->Box<dyn Widget<QueryGraphNode>> {
+            Box::new(Label::new("TEST DATA"))
+
+        }
 
     }
     impl<T> BasicNodeFunctionality for T 
@@ -272,7 +277,8 @@ pub mod node {
             Box::new(
                 Flex::column()
                     .with_child(Label::new(
-                        |(_, item): &(QueryGraphState, T), _env: &_| {
+                        |(_, item): &(QueryGraphState, QueryGraphNode), _env: &_| {
+                            let item = item.borrow();
                             format!("{} :#{}",item.display_name(), item.get_id())
                         },
                     ))
@@ -281,139 +287,129 @@ pub mod node {
                         Flex::column()
                         .with_child(Label::new("Child:"))
 
-                    .with_child(ViewSwitcher::new(
-                        |d: &(QueryGraphState, (T,usize)), _env: &_| d.0.ver,
-                        |selector, (shared, (item,index)): &(QueryGraphState, (T,usize)), _env| {
-                            let mut elems = vec![("None".to_owned(), SelectedChild::None)];
-                            
-                            if let Some(child) = &item.basic().children[*index] {
-                                let child_id = child.borrow().get_id();
-                                elems.push((
-                                    format!("#{}", child_id),
-                                    SelectedChild::Some(child_id),
-                                ));
-                            }else {
-                                for k in shared.leaves.iter() {
-                                    // Dont include my parent as an option
-                                    if k.borrow().contains_node(item.get_id()){
-                                        continue;
+                        .with_child(ViewSwitcher::new(
+                            |d: &(QueryGraphState, (T,usize)), _env: &_| d.0.ver,
+                            |selector, (shared, (item,index)): &(QueryGraphState, (T,usize)), _env| {
+                                let mut elems = vec![("None".to_owned(), SelectedChild::None)];
+                                
+                                if let Some(child) = &item.basic().children[*index] {
+                                    let child_id = child.borrow().get_id();
+                                    elems.push((
+                                        format!("#{}", child_id),
+                                        SelectedChild::Some(child_id),
+                                    ));
+                                }else {
+                                    for k in shared.leaves.iter() {
+                                        // Dont include my parent as an option
+                                        if k.borrow().contains_node(item.get_id()){
+                                            continue;
+                                        }
+                                        let other_id = k.borrow().get_id();
+                                        if other_id != item.get_id() {
+                                            elems.push((
+                                                format!("#{}", other_id),
+                                                SelectedChild::Some(other_id),
+                                            ));
+                                        }
                                     }
-                                    let other_id = k.borrow().get_id();
-                                    if other_id != item.get_id() {
-                                        elems.push((
-                                            format!("#{}", other_id),
-                                            SelectedChild::Some(other_id),
-                                        ));
-                                    }
+
                                 }
+                                Box::new(ListSelect::new(elems).lens(lens::Field::new(
+                                    |(_, (item,index)): &(QueryGraphState, (T,usize))| &item.basic().selected_child_ids[*index],
+                                    |(_, (item,index))| &mut item.basic_mut().selected_child_ids[*index],
+                                )))
+                            },
+                        ))
 
+                        .with_child(ViewSwitcher::new(|d:&(QueryGraphState,(T,usize)),_env:&_|d.1.0.basic().children[d.1.1].is_some(),
+                        |selector, (shared_outer,(item_outer,child_index)): &(QueryGraphState, (T,usize)), _env| {
+                            if item_outer.basic().children[*child_index].is_some() {
+                                Box::new(
+                                    ViewSwitcher::new(
+                                        |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.0.ver,
+                                        |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
+                                                item.borrow().create_sideview_elem()
+                                        },
+                                    ).lens(lens::Identity.map(
+                                        |d: &(QueryGraphState, (T,usize))| {(d.0.clone(), d.1.0.basic().children[d.1.1].clone().unwrap())},
+                                        |d: &mut (QueryGraphState, (T,usize)), x: (QueryGraphState, QueryGraphNode)| {
+                                            d.0 = x.0;
+                                            
+                                        }
+                                        ))
+                                    )
+                            }else {
+                                Box::new(Label::new("No Child"))
                             }
-                            Box::new(ListSelect::new(elems).lens(lens::Field::new(
-                                |(_, (item,index)): &(QueryGraphState, (T,usize))| &item.basic().selected_child_ids[*index],
-                                |(_, (item,index))| &mut item.basic_mut().selected_child_ids[*index],
-                            )))
-                        },
-                    ))
 
-                    .with_child(ViewSwitcher::new(|d:&(QueryGraphState,(T,usize)),_env:&_|d.1.0.basic().children[d.1.1].is_some(),
-                    |selector, (shared_outer,(item_outer,child_index)): &(QueryGraphState, (T,usize)), _env| {
-                        if item_outer.basic().children[*child_index].is_some() {
-                            Box::new(
-                                ViewSwitcher::new(
-                                    |d: &(QueryGraphState, QueryGraphNode), _env: &_| d.0.ver,
-                                    |selector, (shared, item): &(QueryGraphState, QueryGraphNode), _env| {
-                                            item.borrow().create_sideview_elem()
-                                    },
-                                ).lens(lens::Identity.map(
-                                    |d: &(QueryGraphState, (T,usize))| {(d.0.clone(), d.1.0.basic().children[d.1.1].clone().unwrap())},
-                                    |d: &mut (QueryGraphState, (T,usize)), x: (QueryGraphState, QueryGraphNode)| {
-                                        d.0 = x.0;
-                                        
-                                    }
-                                    ))
-                                )
-                        }else {
-                            Box::new(Label::new("No Child"))
-                        }
-
-                    }))
+                        }))
 
                     })
                         .lens(lens::Identity.map(
 
-                                |d: &(QueryGraphState, T)| {
+                                |d: &(QueryGraphState, QueryGraphNode)| {
                                     let mut res = Vector::new();
-                                    for i in 0..d.1.num_children() {
-                                        res.push_back((d.1.clone(), i));
+                                    let num_children = d.1.borrow().num_children();
+                                    for i in 0..num_children {
+                                        res.push_back((d.1.borrow().as_any().downcast_ref::<T>().expect("Cant fail").clone(), i));
                                     }
                                     (d.0.clone(), res)
                                 }, 
-                                |d: &mut (QueryGraphState, T), x:(QueryGraphState,Vector<(T, usize)>)| {
+                                |d: &mut (QueryGraphState, QueryGraphNode), x:(QueryGraphState,Vector<(T, usize)>)| {
 
                                     d.0 = x.0;
-                                    for i in 0..d.1.num_children() {
-                                        d.1.basic_mut().children[i] = x.1[i].0.basic().children[i].clone();
-                                        d.1.basic_mut().selected_child_ids[i] = x.1[i].0.basic().selected_child_ids[i].clone();
+                                    let num_children = d.1.borrow().num_children();
+                                    for i in 0..num_children {
+                                        d.1.borrow_mut().basic_mut().children[i] = x.1[i].0.basic().children[i].clone();
+                                        d.1.borrow_mut().basic_mut().selected_child_ids[i] = x.1[i].0.basic().selected_child_ids[i].clone();
                                     }
 
-                                })) 
-                    )
-                    .border(Color::grey(0.6),2.0)
-                    .rounded(5.0)
-                    .lens(lens::Identity.map(
-                        |d: &(QueryGraphState, QueryGraphNode)| {
-                            (
-                                d.0.clone(),
-                                d.1.borrow_mut()
-                                    .as_any()
-                                    .downcast_ref::<T>()
-                                    .expect("WFT")
-                                    .clone(),
-                            )
-                        },
-                        |d: &mut (QueryGraphState, QueryGraphNode),
-                         mut x: (QueryGraphState, T)| {
-                            d.0 = x.0;
-                        for child_index in 0..d.1.borrow().num_children(){
-                            if let SelectedChild::Some(child_id) = x.1.basic().selected_child_ids[child_index] {
-                                if x.1.basic().children[child_index].is_none() {
-                                    let mut item_index = None;
-                                    for (i, leaf) in d.0.leaves.iter().enumerate() {
-                                        if leaf.borrow().get_id() == child_id {
-                                            item_index = Some(i);
-                                            break;
+                                    for child_index in 0..num_children{
+                                        let child_id_option = d.1.borrow().basic().selected_child_ids[child_index].clone();
+                                        if let SelectedChild::Some(child_id) = child_id_option {
+                                            let none_child = d.1.borrow().basic().children[child_index].is_none();
+                                            if none_child {
+                                                let mut item_index = None;
+                                                for (i, leaf) in d.0.leaves.iter().enumerate() {
+                                                    if leaf.borrow().get_id() == child_id {
+                                                        item_index = Some(i);
+                                                        break;
+                                                    }
+                                                }
+
+                                                let new_child = d.0.leaves.remove(
+                                                    item_index
+                                                        .expect("Unable to find element to make my child"),
+                                                );
+                                                d.1.borrow_mut().basic_mut().children[child_index] = Some(new_child);
+                                                d.0.ver+=1;
+                                            }
+                                        }
+                                        if let SelectedChild::None = child_id_option {
+                                            let none_child = d.1.borrow().basic().children[child_index].is_none();
+                                            if !none_child {
+                                                let mut d1mut = d.1.borrow_mut();
+                                                let child = d1mut.basic_mut().children[child_index].as_mut().unwrap();
+                                                d.0.leaves.push_back(child.clone());
+                                                d1mut.basic_mut().children[child_index] = None;
+                                                d.0.ver+=1;
+                                            }
                                         }
                                     }
-
-                                    let new_child = d.0.leaves.remove(
-                                        item_index
-                                            .expect("Unable to find element to make my child"),
-                                    );
-                                    x.1.basic_mut().children[child_index] = Some(new_child);
-                                    d.0.ver+=1;
-                                }
-                            }
-                            if let SelectedChild::None = x.1.basic().selected_child_ids[child_index] {
-                                if x.1.basic().children[child_index].is_some() {
-                                    let child = x.1.basic_mut().children[child_index].as_mut().unwrap();
-                                    d.0.leaves.push_back(child.clone());
-                                    x.1.basic_mut().children[child_index] = None;
-                                    d.0.ver+=1;
-                                }
-                            }
-                         }
-                            {
-                                let mut me = d.1.borrow_mut();
-                                let real: &mut T =
-                                    me.as_any_mut().downcast_mut::<T>().unwrap();
-                                *real = x.1;
-                            }
-                            d.0.refresh_vgd();
-                        },
+                                        // {
+                                        //     let mut me = d.1.borrow_mut();
+                                        //     let real: &mut T =
+                                        //         me.as_any_mut().downcast_mut::<T>().unwrap();
+                                        //     *real = x.1;
+                                        // }
+                                        d.0.refresh_vgd();
+                        }
+                        )
                     ))
+                    .border(Color::grey(0.6),2.0)
+                    .rounded(5.0)
             )
         }
-
 
     }
 }
