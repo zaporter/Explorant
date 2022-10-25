@@ -7,6 +7,15 @@ edition = "2021"
 
 [dependencies]
 # librr_rs = {git="https://github.com/zaporter/librr_rs"}
+
+actix-web = "4"
+actix-files = "0.6"
+actix-cors = "0.6.2"
+dirs="4"
+anyhow="1.0"
+json = "0.12"
+log = "0.4"
+
 librr_rs = {path="../librr_rs/"}
 druid_graphviz_layout = {path="../druid_graphviz_layout/"}
 serial_test = "0.8.0"
@@ -19,6 +28,7 @@ object="0.29"
 iced-x86 = {version="1.17.0",features=["code_asm"]}
 symbolic={version="9.1",features=["demangle"]}
 symbolic-demangle={version="9.1", features=["rust", "cpp", "msvc"]}
+chrono = {version = "0.4.22", features = ["serde"] }
 dot="0.1.4"
 symbolic-common={version="9.1"}
 procmaps = {git = "https://github.com/zaporter/procmaps"}
@@ -34,3 +44,13 @@ git = "https://github.com/linebender/druid"
 rev = "fc05e965c85fced8720c655685e02478e0530e94" # update this when upgrading to newer druid
 # path = "../../projects/druid/druid"
 features = ["im"]
+
+
+
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]

@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![allow(unused)]
 use druid_graphviz_layout::adt::dag::NodeHandle;
 use iced_x86::{
     Code, ConditionCode, Decoder, DecoderOptions, FlowControl, Instruction, InstructionInfoFactory,
@@ -8,6 +9,7 @@ use itertools::{Itertools, Zip};
 use librr_rs::*;
 use procmaps::{Map, Mappings};
 use rust_lapper::{Interval, Lapper};
+use shared_structs::*;
 use similar::{capture_diff_slices, Algorithm};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -18,17 +20,29 @@ use std::time::SystemTime;
 use std::{error::Error, sync::Arc};
 
 use crate::block::{Block, BlockEvaluation, CodeFlow};
+use crate::simulation::Simulation;
+
+use actix_cors::Cors;
+use actix_files::NamedFile;
+use actix_web::http::header::{ContentDisposition, DispositionType};
+use actix_web::{
+    get, middleware, web, App, Error as ActixError, HttpRequest, HttpResponse, HttpServer,
+};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 
 mod block;
 // mod code_flow_graph;
 // mod graph_layout;
 mod gui;
-mod recorder;
 mod lcs;
-mod trampoline;
 mod query;
-use crate::query::*;
+mod recorder;
+mod shared_structs;
+mod simulation;
+mod trampoline;
 use crate::lcs::*;
+use crate::query::*;
 use crate::trampoline::*;
 
 // fn get_symbols<'a>(
@@ -43,35 +57,98 @@ use crate::trampoline::*;
 //     }
 //     Ok(to_ret)
 // }
-fn main() {
 
-    librr_rs::raise_resource_limits();
-    gui::start_query_editor();
-    // let output_directory = "/home/zack/dbfss";
-    // let exe_path = "/home/zack/war_simulator";
-    // recorder::record(exe_path,output_directory);
-    // let addrs_no_div= get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
-    // let time = SystemTime::now();
-    // let mut tree = BlockVocabulary::default();
-    // tree.add_experience_to_vocabulary(&addrs_no_div);
-    // dbg!(tree.num_words);
-
-    // // tree.add_experience_to_vocabulary(&addrs_div);
-    // dbg!(tree.num_words);
-    // let no_div_encoded = tree.addrs_to_block_vocabulary(&addrs_no_div);
-    // // let div_encoded=tree.addrs_to_block_vocabulary(&addrs_div);
-    // dbg!(no_div_encoded.len());
-    // // dbg!(div_encoded.len());
-    // dbg!(time.elapsed().unwrap());
-
+async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
+    let req = req.0;
+    HttpResponse::Ok().json(PingResponse { id: req.id })
 }
+async fn get_instruction_pointer(
+    data: web::Data<Arc<Simulation>>,
+    _req: web::Json<EmptyRequest>,
+) -> HttpResponse {
+    let ip = data.get_ref().last_rip.lock();
+    match ip {
+        Ok(instruction_pointer) => HttpResponse::Ok().json(InstructionPointerResponse {
+            instruction_pointer: *instruction_pointer,
+        }),
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    }
+}
+async fn get_general_info(
+        data:web::Data<Arc<Simulation>>,
+        _req:web::Json<EmptyRequest>
+    ) -> HttpResponse {
+    let mut binary_interface = match data.get_ref().bin_interface.lock() {
+        Ok(k)=>k,
+        Err(k)=> {return HttpResponse::InternalServerError().body(k.to_string())},
+    };
+    let data = GeneralInfoResponse {
+        binary_name: "chicken".into(),
+        start_time_millis:1000,
+        end_time_millis:2000,
+        frame_time_map:Vec::new(),
+        proc_maps: binary_interface.get_proc_map().unwrap().to_vec(),
+    };
+    HttpResponse::Ok().json(data)
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    let simulation =
+        Simulation::new(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
+    let simulation = Arc::new(simulation);
+    let port = 8080;
+    let ip = "127.0.0.1";
+    log::info!("Starting HTTP server at {}:{}", &ip, port);
+    HttpServer::new(move || {
+        App::new()
+            // enable logger
+            .wrap(middleware::Logger::default())
+            .wrap(Cors::permissive())
+            .app_data(web::Data::new(simulation.clone()))
+            .app_data(web::JsonConfig::default().limit(40000096)) // <- limit size of the payload (global configuration)
+            .service(web::resource("/ping").route(web::post().to(ping)))
+            .service(web::resource("/instruction_pointer").route(web::post().to(get_instruction_pointer)))
+            .service(web::resource("/general_info").route(web::post().to(get_general_info)))
+
+        // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))
+        // .service(web::resource("/getsheet").route(web::post().to(get_sheet)))
+        // .service(web::resource("/updatesheet").route(web::post().to(update_sheet)))
+        // .service(web::resource("/forksheet").route(web::post().to(fork_sheet)))
+    })
+    .bind((ip, port))?
+    .run()
+    .await
+}
+// fn main() {
+//     librr_rs::raise_resource_limits();
+//     gui::start_query_editor();
+// let output_directory = "/home/zack/dbfss";
+// let exe_path = "/home/zack/war_simulator";
+// recorder::record(exe_path,output_directory);
+// let addrs_no_div= get_addrs(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
+// let time = SystemTime::now();
+// let mut tree = BlockVocabulary::default();
+// tree.add_experience_to_vocabulary(&addrs_no_div);
+// dbg!(tree.num_words);
+
+// // tree.add_experience_to_vocabulary(&addrs_div);
+// dbg!(tree.num_words);
+// let no_div_encoded = tree.addrs_to_block_vocabulary(&addrs_no_div);
+// // let div_encoded=tree.addrs_to_block_vocabulary(&addrs_div);
+// dbg!(no_div_encoded.len());
+// // dbg!(div_encoded.len());
+// dbg!(time.elapsed().unwrap());
+
+// }
 fn get_addrs(sample_dateviewer_dir: PathBuf) -> Vec<usize> {
     let mut bin_interface = BinaryInterface::new_at_target_event(0, sample_dateviewer_dir.clone());
 
     let cthread = bin_interface.get_current_thread();
     bin_interface.pin_mut().set_query_thread(cthread);
     bin_interface.set_pass_signals(vec![
-        0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
+        0, 0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
     ]);
     let rip = bin_interface
         .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
@@ -80,14 +157,14 @@ fn get_addrs(sample_dateviewer_dir: PathBuf) -> Vec<usize> {
 
     let mut stack_info = TrampolineStackInfo {
         base_addr: 0x71000000,
-        // Ive had success with 65KiB 
-        // but I made it 256 MiB just in case. 
+        // Ive had success with 65KiB
+        // but I made it 256 MiB just in case.
         // This shouldn't overflow
         //
-        //NOTE: 
-        //  This is consistently faster on my machine (~0.05 sec) if 
-        //  it is given 1GiB instead of 256MiB. 
-        //  I have no idea why. 
+        //NOTE:
+        //  This is consistently faster on my machine if
+        //  it is given 1GiB instead of 256MiB.
+        //  I have no idea why.
         size: 0x10000000,
         reserved_space: 0x40,
     };
@@ -113,7 +190,10 @@ fn get_addrs(sample_dateviewer_dir: PathBuf) -> Vec<usize> {
     let start_continue = SystemTime::now();
     let mut signal = 5;
     while signal != 9 {
-        signal = bin_interface.pin_mut().continue_forward_jog_undefined(step).unwrap();
+        signal = bin_interface
+            .pin_mut()
+            .continue_forward_jog_undefined(step)
+            .unwrap();
         tr.clear_address_stack(&mut bin_interface).unwrap();
     }
     dbg!(signal);
