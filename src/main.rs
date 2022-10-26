@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 mod block;
 // mod code_flow_graph;
 // mod graph_layout;
-mod gui;
+// mod gui;
 mod lcs;
 mod query;
 mod recorder;
@@ -45,18 +45,6 @@ use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
 
-// fn get_symbols<'a>(
-//     file: &'a object::File,
-// ) -> Result<Vec<(String, object::Symbol<'a, 'a>)>, Box<dyn Error>> {
-//     let mut to_ret = Vec::new();
-//     for symbol in file.symbol_table().ok_or("No symboltable found")?.symbols() {
-//         let name: String = Name::from(symbol.name().unwrap())
-//             .try_demangle(DemangleOptions::name_only())
-//             .to_string();
-//         to_ret.push((name, symbol));
-//     }
-//     Ok(to_ret)
-// }
 
 async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
     let req = req.0;

@@ -1,5 +1,6 @@
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{create_dir_all, read_dir, read_to_string, remove_dir_all, remove_file, File};
 use std::process::Command;
@@ -16,7 +17,10 @@ const RECORDING_TEMP_FILE_NAME: &str = "unique_temp_recording_output.mkv";
 const RECORDING_TEMP_TIMES_NAME: &str = "unique_temp_recording_output_times.txt";
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
-struct FrameTimeMap(Vec<(i64, String)>);
+struct FrameTimeMap {
+    frames: Vec<(i64, u128, String)>,
+    times: HashMap<i64, u128>,
+}
 
 pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Error>> {
     remove_dir_all(output_directory);
@@ -55,15 +59,18 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
 
     thread::sleep(Duration::from_millis(1000));
     let mut rec_interface = RecordingInterface::new(format!("-o {output_directory} {exe_path}"));
-    let mut frame_times_to_system_milis: Vec<(i64, u128)> = Vec::new();
+    let mut frame_times_to_system_milis: HashMap<i64, u128> = HashMap::new();
     while rec_interface.pin_mut().continue_recording() {
-        frame_times_to_system_milis.push((
+        if frame_times_to_system_milis.contains_key(&rec_interface.current_frame_time()) {
+            continue; // This should never happen but it is worth handling properly
+        }
+        frame_times_to_system_milis.insert(
             rec_interface.current_frame_time(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_millis(),
-        ));
+        );
     }
     thread::sleep(Duration::from_millis(1000));
     dbg!(child.id());
@@ -83,7 +90,7 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
     let frames_names = frames_dir.map(|f| f.unwrap().file_name()).sorted();
     let frame_times_str = read_to_string(RECORDING_TEMP_TIMES_NAME)?;
     let mut frametimemap = FrameTimeMap::default();
-    // correlate the recorded times and frames with the recorded times and frame_times 
+    // correlate the recorded times and frames with the recorded times and frame_times
     // insert everything into the frametimemap
     for (time_str, frame_img_entry) in frame_times_str.split("\n").skip(1).zip(frames_names) {
         let time = time_str.parse::<u128>()? + 1500000000000;
@@ -93,9 +100,10 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
         'inner: for (frame_time, real_time) in frame_times_to_system_milis.iter() {
             dbg!(real_time);
             dbg!(frame_time);
-            if time>last_real_time  && time <= *real_time {
-                frametimemap.0.push((
+            if time > last_real_time && time <= *real_time {
+                frametimemap.frames.push((
                     *frame_time,
+                    *real_time,
                     format!("frames/{}", frame_img_entry.to_str().unwrap()),
                 ));
                 break 'inner;
@@ -103,8 +111,9 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
             last_real_time = *real_time;
         }
     }
-    let mut frametimemapfile = File::create(format!("{}/frame_time_map.json5",output_directory))?;
-    write!(frametimemapfile,"{}", json5::to_string(&frametimemap)?)?;
+    frametimemap.times=frame_times_to_system_milis;
+    let mut frametimemapfile = File::create(format!("{}/frame_time_map.json5", output_directory))?;
+    write!(frametimemapfile, "{}", json5::to_string(&frametimemap)?)?;
 
     remove_file(RECORDING_TEMP_TIMES_NAME)?;
     remove_file(RECORDING_TEMP_FILE_NAME)?;
