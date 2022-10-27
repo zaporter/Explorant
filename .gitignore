@@ -1,1 +1,3 @@
 /target
+test-executables/*/target
+test-executables/build

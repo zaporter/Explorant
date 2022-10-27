@@ -18,6 +18,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{error::Error, sync::Arc};
+use clap::{Parser, Subcommand};
 
 use crate::block::{Block, BlockEvaluation, CodeFlow};
 use crate::simulation::Simulation;
@@ -46,6 +47,26 @@ use crate::query::*;
 use crate::trampoline::*;
 
 
+#[derive(Parser)]
+#[command(author,version,about,long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+#[derive(Subcommand)]
+enum Commands {
+    Record {
+        #[arg(short,long, value_name="FILE")]
+        exe: PathBuf,
+        #[arg(short,long,value_name="FOLDER")]
+        save_dir: PathBuf,
+    },
+    Serve {
+        #[arg(short,long,value_name="FOLDER")]
+        save_dir:PathBuf,
+    },
+}
+
 async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
     let req = req.0;
     HttpResponse::Ok().json(PingResponse { id: req.id })
@@ -63,18 +84,18 @@ async fn get_instruction_pointer(
     }
 }
 async fn get_general_info(
-        data:web::Data<Arc<Simulation>>,
-        _req:web::Json<EmptyRequest>
-    ) -> HttpResponse {
+    data: web::Data<Arc<Simulation>>,
+    _req: web::Json<EmptyRequest>,
+) -> HttpResponse {
     let mut binary_interface = match data.get_ref().bin_interface.lock() {
-        Ok(k)=>k,
-        Err(k)=> {return HttpResponse::InternalServerError().body(k.to_string())},
+        Ok(k) => k,
+        Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
     };
     let data = GeneralInfoResponse {
         binary_name: "chicken".into(),
-        start_time_millis:1000,
-        end_time_millis:2000,
-        frame_time_map:Vec::new(),
+        start_time_millis: 1000,
+        end_time_millis: 2000,
+        frame_time_map: Vec::new(),
         proc_maps: binary_interface.get_proc_map().unwrap().to_vec(),
     };
     HttpResponse::Ok().json(data)
@@ -82,13 +103,31 @@ async fn get_general_info(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+
+    std::env::set_var("RUST_LOG", "debug");
+    std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
-    let simulation =
-        Simulation::new(PathBuf::from_str("/home/zack/.local/share/rr/war_simulator-3").unwrap());
-    let simulation = Arc::new(simulation);
+
+    librr_rs::raise_resource_limits();
+
+    let cli = Cli::parse();
+    match &cli.command {
+        Commands::Record { exe, save_dir }=>{
+            recorder::record(exe, save_dir, None);
+            Ok(())
+        },
+        Commands::Serve { save_dir }=> {
+            return run_server(save_dir.clone()).await;
+        }
+    }
+}
+async fn run_server(save_dir : PathBuf) -> std::io::Result<()> {
+
+    let simulation = Arc::new(Simulation::new(save_dir));
     let port = 8080;
     let ip = "127.0.0.1";
     log::info!("Starting HTTP server at {}:{}", &ip, port);
+    
     HttpServer::new(move || {
         App::new()
             // enable logger
@@ -97,7 +136,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(simulation.clone()))
             .app_data(web::JsonConfig::default().limit(40000096)) // <- limit size of the payload (global configuration)
             .service(web::resource("/ping").route(web::post().to(ping)))
-            .service(web::resource("/instruction_pointer").route(web::post().to(get_instruction_pointer)))
+            .service(
+                web::resource("/instruction_pointer")
+                    .route(web::post().to(get_instruction_pointer)),
+            )
             .service(web::resource("/general_info").route(web::post().to(get_general_info)))
 
         // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))

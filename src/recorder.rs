@@ -3,7 +3,8 @@ use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{create_dir_all, read_dir, read_to_string, remove_dir_all, remove_file, File};
-use std::process::Command;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::{thread, u128};
 
@@ -22,10 +23,24 @@ struct FrameTimeMap {
     times: HashMap<i64, u128>,
 }
 
-pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Error>> {
+pub fn record(
+    exe_path: &PathBuf,
+    output_directory: &PathBuf,
+    exe_args: Option<&str>,
+) -> anyhow::Result<()> {
     remove_dir_all(output_directory);
+    let output_directory_str = output_directory
+        .to_str()
+        .ok_or_else(|| anyhow::Error::msg("Output directory cannot be turned into a str"))?;
+    let exe_path_str = exe_path
+        .to_str()
+        .ok_or_else(|| anyhow::Error::msg("Exe path cannot be turned into a str"))?;
 
     // https://stackoverflow.com/questions/53391150/ffmpeg-obtain-the-system-time-corresponding-to-each-frame-present-in-a-video
+    // TODO: The waiting in this is terrrible and 
+    // brittle. Refactor to use pipes from the child 
+    // to read stdout and stderr to decide when 
+    // ffmpeg is ready to start recording frames 
     let child = Command::new("/usr/bin/ffmpeg")
         .arg("-f")
         .arg("x11grab")
@@ -55,14 +70,22 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
         .arg(RECORDING_TEMP_TIMES_NAME)
         .arg("-vsync")
         .arg("0")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
 
-    thread::sleep(Duration::from_millis(1000));
-    let mut rec_interface = RecordingInterface::new(format!("-o {output_directory} {exe_path}"));
+    thread::sleep(Duration::from_millis(5000));
+    let mut rec_interface = RecordingInterface::new(format!(
+        "--output-trace-dir {} {} {}",
+        output_directory_str,
+        exe_path_str,
+        exe_args.unwrap_or("")
+    ));
     let mut frame_times_to_system_milis: HashMap<i64, u128> = HashMap::new();
+    
     while rec_interface.pin_mut().continue_recording() {
         if frame_times_to_system_milis.contains_key(&rec_interface.current_frame_time()) {
-            continue; // This should never happen but it is worth handling properly
+            continue;
         }
         frame_times_to_system_milis.insert(
             rec_interface.current_frame_time(),
@@ -73,37 +96,53 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
         );
     }
     thread::sleep(Duration::from_millis(1000));
-    dbg!(child.id());
-    signal::kill(Pid::from_raw(child.id() as i32), Signal::SIGINT).unwrap();
+    // dbg!(child.id());
+    signal::kill(Pid::from_raw(child.id() as i32), Signal::SIGINT)?;
 
-    thread::sleep(Duration::from_millis(3000));
+    thread::sleep(Duration::from_millis(2000));
 
-    create_dir_all(format!("{}/frames", output_directory))?;
+    create_dir_all(format!("{}/frames", output_directory_str))?;
     // extract all frames
     let mut child = Command::new("/usr/bin/ffmpeg")
         .arg("-i")
         .arg(RECORDING_TEMP_FILE_NAME)
-        .arg(format!("{}/frames/out-%06d.jpg", output_directory))
+        .arg(format!("{}/frames/out-%06d.jpg", output_directory_str))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
     child.wait()?;
-    let frames_dir = read_dir(format!("{}/frames", output_directory))?;
+    let frames_dir = read_dir(format!("{}/frames", output_directory_str))?;
     let frames_names = frames_dir.map(|f| f.unwrap().file_name()).sorted();
     let frame_times_str = read_to_string(RECORDING_TEMP_TIMES_NAME)?;
     let mut frametimemap = FrameTimeMap::default();
     // correlate the recorded times and frames with the recorded times and frame_times
     // insert everything into the frametimemap
+    frametimemap.frames.push((
+        1,
+        *frame_times_to_system_milis.get(&1).ok_or_else(|| anyhow::Error::msg("Didn't have an entry for the first frame time. Please report this."))?,
+        "frames/out-000001.jpg".into()
+    ));
+    // This is so complicated that you might as well
+    // rewrite it if you need to change something
+    let mut last_real_time = 0;
     for (time_str, frame_img_entry) in frame_times_str.split("\n").skip(1).zip(frames_names) {
         let time = time_str.parse::<u128>()? + 1500000000000;
-        dbg!(time);
-        dbg!(&frame_img_entry);
-        let mut last_real_time = 0;
+        if last_real_time == 0 {
+            last_real_time = time;
+            continue;
+        }
         'inner: for (frame_time, real_time) in frame_times_to_system_milis.iter() {
-            dbg!(real_time);
-            dbg!(frame_time);
+            
             if time > last_real_time && time <= *real_time {
+                // Dont insert duplicate entries for each frame time
+                if let Some(last_inserted_frame_info) = &frametimemap.frames.last(){
+                    if *frame_time == last_inserted_frame_info.0 {
+                        break 'inner;
+                    }
+                }
                 frametimemap.frames.push((
                     *frame_time,
-                    *real_time,
+                    time,
                     format!("frames/{}", frame_img_entry.to_str().unwrap()),
                 ));
                 break 'inner;
@@ -111,9 +150,14 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
             last_real_time = *real_time;
         }
     }
-    frametimemap.times=frame_times_to_system_milis;
-    let mut frametimemapfile = File::create(format!("{}/frame_time_map.json5", output_directory))?;
-    write!(frametimemapfile, "{}", json5::to_string(&frametimemap)?)?;
+    frametimemap.times = frame_times_to_system_milis;
+    let mut frametimemapfile =
+        File::create(format!("{}/frame_time_map.json", output_directory_str))?;
+    write!(
+        frametimemapfile,
+        "{}",
+        serde_json::to_string(&frametimemap)?
+    )?;
 
     remove_file(RECORDING_TEMP_TIMES_NAME)?;
     remove_file(RECORDING_TEMP_FILE_NAME)?;
@@ -121,4 +165,108 @@ pub fn record(exe_path: &str, output_directory: &str) -> Result<(), Box<dyn Erro
 
     println!("Finished Recording");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{io::Read, sync::Once};
+
+    use super::*;
+    use gag::BufferRedirect;
+    use rand::prelude::*;
+
+    static INIT: Once = Once::new();
+    fn initialize() {
+        INIT.call_once(|| {
+            std::env::set_var("RUST_LOG", "debug");
+            std::env::set_var("RUST_BACKTRACE", "1");
+            env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+            librr_rs::raise_resource_limits();
+        });
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn date_viewer_no_args() -> anyhow::Result<()> {
+        initialize();
+        let exe_dir = std::env::current_dir()
+            .unwrap()
+            .join("test-executables/build")
+            .join("date_viewer");
+        let random_number: u64 = rand::thread_rng().gen();
+        let save_dir = std::env::temp_dir().join(format!("mqp_temp_{}",random_number.to_string()));
+        let mut output = String::new();
+        let mut stdout_buf = BufferRedirect::stdout().unwrap();
+        super::record(&exe_dir, &save_dir, None)?;
+        stdout_buf.read_to_string(&mut output).unwrap();
+        drop(stdout_buf);
+        assert!(output.contains("Started"));
+        assert!(output.contains("StartTime"));
+        assert!(!output.contains("EndTime"));
+        assert!(output.contains("Finished"));
+        Ok(())
+    }
+    #[test]
+    #[serial_test::serial]
+    fn date_viewer_args() -> anyhow::Result<()> {
+        initialize();
+        let exe_dir = std::env::current_dir()
+            .unwrap()
+            .join("test-executables/build")
+            .join("date_viewer");
+        let random_number: u64 = rand::thread_rng().gen();
+        let save_dir = std::env::temp_dir().join(format!("mqp_temp_{}",random_number.to_string()));
+        let mut output = String::new();
+        let mut stdout_buf = BufferRedirect::stdout().unwrap();
+        super::record(&exe_dir, &save_dir, Some("100"))?;
+        stdout_buf.read_to_string(&mut output).unwrap();
+        drop(stdout_buf);
+        assert!(output.contains("Started"));
+        assert!(output.contains("StartTime"));
+        assert!(output.contains("EndTime"));
+        assert!(output.contains("Finished"));
+        let file = File::open(save_dir.join("frame_time_map.json"))?;
+        let reader = std::io::BufReader::new(file);
+
+        // Read the JSON contents of the file as an instance of `User`.
+        let map : FrameTimeMap= serde_json::from_reader(reader)?;
+        // this happens when there is not enough delay after
+        // starting the recording. It makes the first avaiable frame equal to the last. 
+        //assert!(map.frames.last().unwrap().2 != "frames/out-000002.jpg");
+        Ok(())
+    }
+    #[test]
+    #[serial_test::serial]
+    fn date_viewer_frame_time_map() -> anyhow::Result<()> {
+        initialize();
+        let exe_dir = std::env::current_dir()
+            .unwrap()
+            .join("test-executables/build")
+            .join("date_viewer");
+        let random_number: u64 = rand::thread_rng().gen();
+        let save_dir = std::env::temp_dir().join(format!("mqp_temp_{}",random_number.to_string()));
+        // log::error!("{:?}",&save_dir);
+        let mut output = String::new();
+        let mut stdout_buf = BufferRedirect::stdout().unwrap();
+        super::record(&exe_dir, &save_dir, Some("10000"))?;
+        stdout_buf.read_to_string(&mut output).unwrap();
+        drop(stdout_buf);
+        assert!(output.contains("Started"));
+        assert!(output.contains("StartTime"));
+        assert!(output.contains("EndTime"));
+        assert!(output.contains("Finished"));
+        
+        let file = File::open(save_dir.join("frame_time_map.json"))?;
+        let reader = std::io::BufReader::new(file);
+
+        // Read the JSON contents of the file as an instance of `User`.
+        let map : FrameTimeMap= serde_json::from_reader(reader)?;
+        assert!(map.frames.len() > 1);
+        assert!(map.frames.len() < 20);
+        // this happens when there is not enough delay after
+        // starting the recording. It makes the first avaiable frame equal to the last. 
+        assert!(map.frames.last().unwrap().2 != "frames/out-000002.jpg");
+        //assert_eq!(map.times.len(),*map.times.keys().max().unwrap() as usize);
+        Ok(())
+    }
 }

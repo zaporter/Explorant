@@ -229,6 +229,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "addr2line"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ca9b76e919fd83ccfb509f51b28c333c0e03f2221616e347a129215cec4e4a9"
+dependencies = [
+ "cpp_demangle",
+ "fallible-iterator",
+ "gimli",
+ "object",
+ "rustc-demangle",
+ "smallvec",
+]
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -292,6 +306,9 @@ name = "anyhow"
 version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9a8f622bcf6ff3df478e9deba3e03e4e04b300f8e6a139e192c05fa3490afc7"
+dependencies = [
+ "backtrace",
+]
 
 [[package]]
 name = "aquamarine"
@@ -478,7 +495,7 @@ version = "0.3.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cab84319d616cfb654d03394f38ab7e6f0919e181b1b57e1fd15e7fb4077d9a7"
 dependencies = [
- "addr2line",
+ "addr2line 0.17.0",
  "cc",
  "cfg-if",
  "libc",
@@ -728,9 +745,24 @@ checksum = "335867764ed2de42325fafe6d18b8af74ba97ee0c590fa016f157535b42ab04b"
 dependencies = [
  "atty",
  "bitflags",
+ "clap_derive",
  "clap_lex",
+ "once_cell",
  "strsim 0.10.0",
  "termcolor",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16a1b0f6422af32d5da0c58e2703320f379216ee70198241c84173a8c5ac28f3"
+dependencies = [
+ "heck 0.4.0",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -809,6 +841,7 @@ dependencies = [
  "actix-cors",
  "actix-files",
  "actix-web",
+ "addr2line 0.18.0",
  "anyhow",
  "chrono",
  "clap 4.0.18",
@@ -821,7 +854,6 @@ dependencies = [
  "gag",
  "iced-x86",
  "itertools 0.10.3",
- "json",
  "json5",
  "librr_rs",
  "log",
@@ -831,6 +863,7 @@ dependencies = [
  "rand",
  "rust-lapper",
  "serde",
+ "serde_json",
  "serial_test",
  "similar",
  "symbolic",
@@ -1935,12 +1968,6 @@ checksum = "49409df3e3bf0856b916e2ceaca09ee28e6871cf7d9ce97a692cacfdb2a25a47"
 dependencies = [
  "wasm-bindgen",
 ]
-
-[[package]]
-name = "json"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "json5"

@@ -80,12 +80,22 @@ impl Simulation {
         let symbol_str = std::fs::read(symbol_file).unwrap();
         let obj_file = object::File::parse(&*symbol_str).unwrap();
         // let symbols = get_symbols(&obj_file).unwrap();
-        let mut symbols = Vec::new();
+        let context = addr2line::Context::new(&obj_file).unwrap();
+        // let mut symbols = Vec::new();
         for symbol in obj_file.symbol_table().ok_or("No symboltable found").unwrap().symbols() {
             let name : String = Name::from(symbol.name().unwrap()).try_demangle(DemangleOptions::name_only()).to_string();
-            symbols.push((name, symbol));
+            //symbols.push((name, symbol));
+            dbg!((name,&symbol));
+            if let Ok(Some(k)) = context.find_location(symbol.address()) {
+                dbg!(k.file);
+                dbg!(k.line);
+                dbg!(k.column);
+                //dbg!(k.unwrap().line);
+                
+            }
+            //log::info!("{}",context.find_location(symbol.address()).unwrap());
         }
-        dbg!(symbols);
+        //dbg!(symbols);
 
         let trampoline_manager = TrampolineManager::new(&mut bin_interface, stack_info, &proc_map);
 

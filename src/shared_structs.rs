@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use procmaps::Map;
 use serde::{Serialize,Deserialize};
 // from https://stackoverflow.com/questions/53866508/how-to-make-a-public-struct-where-all-fields-are-public-without-repeating-pub
@@ -45,7 +47,57 @@ pub_struct!(FrameTimeRange {
 
 // pub_struct!(RequestAllP)
 
-pub_struct!(RequestAllFunctionsRun {
 
 
+pub_struct!(FunctionTimeRangeRequest{
+    range:FrameTimeRange,
+});
+
+pub_struct!(FunctionTimeRangeResponse{
+    addr_of_called_functions:Vec<usize>,
+});
+
+pub_struct!(FunctionInfoRequest{
+    addr_of_function: usize,
+});
+pub_struct!(FunctionInfoResponse{
+    function:Function,
+});
+
+#[derive(Debug,Clone,Serialize,Deserialize,PartialEq)]
+pub enum LineItem {
+    RawString(String),
+    FunctionReference{address: usize},
+    TypeReference{address:usize},
+}
+pub_struct!(Line{
+    address: usize,
+    items: Vec<LineItem>,
+});
+pub_struct!(Type {
+    demangled_name: String,
+});
+
+pub_struct!(Function{
+    source_file: String,
+    demangled_name: String,
+    address: usize,
+    size: usize,
+    lines : Vec<Line>
+});
+
+pub_struct!(FunctionExecutionHeatMapRequest{
+    range:FrameTimeRange,
+    function_address: usize,
+});
+pub_struct!(FrameExecutionHeatMapResponse{
+    map:FunctionExecutionHeatMap,
+});
+
+pub_struct!(FunctionExecutionHeatMap{
+    addr_vs_times_executed: HashMap<usize,usize>,
+});
+
+pub_struct!(ExecutionInfo{
+    
 });
