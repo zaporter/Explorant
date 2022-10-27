@@ -1,5 +1,6 @@
 #![allow(unused_imports)]
 #![allow(unused)]
+use clap::{Parser, Subcommand};
 use druid_graphviz_layout::adt::dag::NodeHandle;
 use iced_x86::{
     Code, ConditionCode, Decoder, DecoderOptions, FlowControl, Instruction, InstructionInfoFactory,
@@ -18,7 +19,6 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::{error::Error, sync::Arc};
-use clap::{Parser, Subcommand};
 
 use crate::block::{Block, BlockEvaluation, CodeFlow};
 use crate::simulation::Simulation;
@@ -46,7 +46,6 @@ use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
 
-
 #[derive(Parser)]
 #[command(author,version,about,long_about = None)]
 struct Cli {
@@ -56,14 +55,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Record {
-        #[arg(short,long, value_name="FILE")]
+        #[arg(short, long, value_name = "FILE")]
         exe: PathBuf,
-        #[arg(short,long,value_name="FOLDER")]
+        #[arg(short, long, value_name = "FOLDER")]
         save_dir: PathBuf,
     },
     Serve {
-        #[arg(short,long,value_name="FOLDER")]
-        save_dir:PathBuf,
+        #[arg(short, long, value_name = "FOLDER")]
+        save_dir: PathBuf,
     },
 }
 
@@ -83,6 +82,38 @@ async fn get_instruction_pointer(
         Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
     }
 }
+async fn get_recorded_frames(
+    data: web::Data<Arc<Simulation>>,
+    _req: web::Json<EmptyRequest>,
+) -> HttpResponse {
+    let mut frame_time_map = match data.get_ref().frame_time_map.lock() {
+        Ok(k) => k,
+        Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
+    };
+    let save_dir = data.as_ref().save_directory.clone();
+    let to_load: Vec<String> = frame_time_map
+        .frames
+        .iter()
+        .map(|(_, _, frame_name)| frame_name.clone())
+        .collect();
+    let mut response = RecordedFramesResponse {
+        frames: HashMap::new(),
+    };
+    for frame_name in to_load {
+        let dir = save_dir.join(frame_name.clone());
+        response
+            .frames
+            .insert(frame_name, Vec::new());
+    }
+    HttpResponse::Ok().json(response)
+
+    // match ip {
+    //     Ok(instruction_pointer) => HttpResponse::Ok().json(InstructionPointerResponse {
+    //         instruction_pointer: *instruction_pointer,
+    //     }),
+    //     Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+    // }
+}
 async fn get_general_info(
     data: web::Data<Arc<Simulation>>,
     _req: web::Json<EmptyRequest>,
@@ -91,11 +122,13 @@ async fn get_general_info(
         Ok(k) => k,
         Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
     };
+    let mut frame_time_map = match data.get_ref().frame_time_map.lock() {
+        Ok(k) => k,
+        Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
+    };
     let data = GeneralInfoResponse {
-        binary_name: "chicken".into(),
-        start_time_millis: 1000,
-        end_time_millis: 2000,
-        frame_time_map: Vec::new(),
+        binary_name: binary_interface.get_exec_file().into(),
+        frame_time_map: frame_time_map.clone(),
         proc_maps: binary_interface.get_proc_map().unwrap().to_vec(),
     };
     HttpResponse::Ok().json(data)
@@ -103,7 +136,6 @@ async fn get_general_info(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
     std::env::set_var("RUST_LOG", "debug");
     std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
@@ -112,22 +144,21 @@ async fn main() -> std::io::Result<()> {
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Record { exe, save_dir }=>{
+        Commands::Record { exe, save_dir } => {
             recorder::record(exe, save_dir, None);
             Ok(())
-        },
-        Commands::Serve { save_dir }=> {
+        }
+        Commands::Serve { save_dir } => {
             return run_server(save_dir.clone()).await;
         }
     }
 }
-async fn run_server(save_dir : PathBuf) -> std::io::Result<()> {
-
-    let simulation = Arc::new(Simulation::new(save_dir));
+async fn run_server(save_dir: PathBuf) -> std::io::Result<()> {
+    let simulation: Arc<Simulation> = Arc::new(Simulation::new(save_dir).unwrap());
     let port = 8080;
     let ip = "127.0.0.1";
     log::info!("Starting HTTP server at {}:{}", &ip, port);
-    
+
     HttpServer::new(move || {
         App::new()
             // enable logger
@@ -141,6 +172,7 @@ async fn run_server(save_dir : PathBuf) -> std::io::Result<()> {
                     .route(web::post().to(get_instruction_pointer)),
             )
             .service(web::resource("/general_info").route(web::post().to(get_general_info)))
+            .service(web::resource("/recorded_frames").route(web::post().to(get_recorded_frames)))
 
         // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))
         // .service(web::resource("/getsheet").route(web::post().to(get_sheet)))

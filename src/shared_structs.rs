@@ -27,13 +27,14 @@ pub_struct!(InstructionPointerResponse{
     instruction_pointer:usize,
 });
 
+pub_struct!(RecordedFramesResponse{
+    frames: HashMap<String, Vec<u8>>,
+});
+
 pub_struct!(GeneralInfoRequest{});
 pub_struct!(GeneralInfoResponse {
     binary_name: String,
-    start_time_millis:usize,
-    end_time_millis:usize,
-    // map of frame_time->time_millis
-    frame_time_map: Vec<(usize,usize)>,
+    frame_time_map: FrameTimeMap,
     proc_maps: Vec<Map>,
 });
 
@@ -96,6 +97,11 @@ pub_struct!(FrameExecutionHeatMapResponse{
 
 pub_struct!(FunctionExecutionHeatMap{
     addr_vs_times_executed: HashMap<usize,usize>,
+});
+
+pub_struct!( FrameTimeMap {
+    frames: Vec<(i64, u128, String)>,
+    times: HashMap<i64, u128>,
 });
 
 pub_struct!(ExecutionInfo{

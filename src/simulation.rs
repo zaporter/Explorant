@@ -6,17 +6,19 @@ use rust_lapper::{Lapper, Interval};
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
 use object::{
-    Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, Section, SectionKind, Segment,
+    Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, Section, SectionKind, Segment
 };
 
-use crate::trampoline::{TrampolineManager, TrampolineStackInfo};
+use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::FrameTimeMap};
 
 pub struct Simulation{
     pub bin_interface : Mutex<BinaryInterface>,
     pub trampoline_manager : Mutex<TrampolineManager>,
     pub proc_map: Mutex<Lapper<usize,Map>>,
+    pub frame_time_map : Mutex<FrameTimeMap>,
     // pub symbol_table: Mutex<Vec<(String, object::Symbol<'static,'static>)>>,
     pub last_rip: Mutex<usize>,
+    pub save_directory : PathBuf,
 }
 // SAFETY: const *cxx:void is not send and sync
 // because if a thread context switches while running
@@ -38,7 +40,7 @@ fn get_symbols<'a>(file : &'a object::File) -> Result<Vec<(String,object::Symbol
 }
 
 impl Simulation {
-    pub fn new(directory:PathBuf) -> Self {
+    pub fn new(directory:PathBuf) -> anyhow::Result<Self> {
         let mut bin_interface = BinaryInterface::new_at_target_event(0, directory.clone());
         let cthread = bin_interface.get_current_thread();
         bin_interface.pin_mut().set_query_thread(cthread);
@@ -95,17 +97,24 @@ impl Simulation {
             }
             //log::info!("{}",context.find_location(symbol.address()).unwrap());
         }
-        //dbg!(symbols);
+        let frame_time_map : FrameTimeMap= {
+            let file = std::fs::File::open(directory.join("frame_time_map.json"))?;
+            let reader = std::io::BufReader::new(file);
+
+            serde_json::from_reader(reader)?
+        };
 
         let trampoline_manager = TrampolineManager::new(&mut bin_interface, stack_info, &proc_map);
 
-        Self{
+        Ok(Self{
             bin_interface: Mutex::new(bin_interface),
             trampoline_manager: Mutex::new(trampoline_manager),
             proc_map: Mutex::new(proc_map),
+            frame_time_map: Mutex::new(frame_time_map),
             last_rip: Mutex::new(rip),
+            save_directory: directory,
             // symbol_table:Mutex::new(symbols),
-        }
+        })
 
     }
 }
