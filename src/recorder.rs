@@ -116,6 +116,8 @@ pub fn record(
     };
     // correlate the recorded times and frames with the recorded times and frame_times
     // insert everything into the frametimemap
+    // let mut last_real_time = 0;
+    // Add first frame before starting
     frametimemap.frames.push((
         1,
         *frame_times_to_system_milis.get(&1).ok_or_else(|| {
@@ -123,33 +125,33 @@ pub fn record(
         })?,
         "frames/out-000001.jpg".into(),
     ));
-    // This is so complicated that you might as well
-    // rewrite it if you need to change something
-    let mut last_real_time = 0;
-    for (time_str, frame_img_entry) in frame_times_str.split("\n").skip(1).zip(frames_names) {
+    // Add all frames during execution
+    
+    for (time_str, frame_img_entry) in frame_times_str.split("\n").skip(1).zip(frames_names.clone()) {
         let time = time_str.parse::<u128>()? + 1500000000000;
-        if last_real_time == 0 {
-            last_real_time = time;
-            continue;
-        }
-        'inner: for (frame_time, real_time) in frame_times_to_system_milis.iter() {
-            if time > last_real_time && time <= *real_time {
-                // Dont insert duplicate entries for each frame time
-                if let Some(last_inserted_frame_info) = &frametimemap.frames.last() {
-                    if *frame_time == last_inserted_frame_info.0 {
-                        break 'inner;
-                    }
-                }
+        for (current_entry, next_entry) in frame_times_to_system_milis.iter().sorted_by_key(|a| a.0).tuple_windows() {
+            if current_entry.1 < &time && next_entry.1>= &time {
                 frametimemap.frames.push((
-                    *frame_time,
+                    *current_entry.0,
                     time,
                     format!("frames/{}", frame_img_entry.to_str().unwrap()),
                 ));
-                break 'inner;
             }
-            last_real_time = *real_time;
         }
     }
+    // Add first frame after execution
+    {
+        let (last_ft, last_ft_time) = frame_times_to_system_milis.iter().sorted_by_key(|a| a.0).last().ok_or_else(|| anyhow::Error::msg("No last frame to save"))?;
+        let last_frame_name = frames_names.last().ok_or_else(|| anyhow::Error::msg("No last frame. Did ffmpeg start?"))?;
+        frametimemap.frames.push((
+            *last_ft,
+            *last_ft_time,
+            format!("frames/{}", last_frame_name.to_str().unwrap()),
+        ));
+
+        
+    }
+
     frametimemap.times = frame_times_to_system_milis;
     let mut frametimemapfile =
         File::create(format!("{}/frame_time_map.json", output_directory_str))?;

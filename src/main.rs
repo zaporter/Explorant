@@ -42,6 +42,7 @@ mod recorder;
 mod shared_structs;
 mod simulation;
 mod trampoline;
+mod mvp;
 use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
@@ -61,6 +62,10 @@ enum Commands {
         save_dir: PathBuf,
     },
     Serve {
+        #[arg(short, long, value_name = "FOLDER")]
+        save_dir: PathBuf,
+    },
+    Mvp {
         #[arg(short, long, value_name = "FOLDER")]
         save_dir: PathBuf,
     },
@@ -147,10 +152,14 @@ async fn main() -> std::io::Result<()> {
         Commands::Record { exe, save_dir } => {
             recorder::record(exe, save_dir, None);
             Ok(())
-        }
+        },
         Commands::Serve { save_dir } => {
             return run_server(save_dir.clone()).await;
-        }
+        },
+        Commands::Mvp {save_dir} => {
+            mvp::run(save_dir);
+            Ok(())
+        },
     }
 }
 async fn run_server(save_dir: PathBuf) -> std::io::Result<()> {
