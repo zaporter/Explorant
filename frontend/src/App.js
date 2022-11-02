@@ -26,6 +26,7 @@ function App() {
     <div className="App">
         <p>Helllo</p>
         {generalInfo && <LaneViewer generalInfo={generalInfo}/>}
+        {generalInfo && <p> {JSON.stringify(generalInfo)}</p>}
         <p>{count.id}</p>
         <p>{ip&&ip.instruction_pointer}</p>
         {/* <p>{generalInfo && JSON.stringify(generalInfo)}</p> */}

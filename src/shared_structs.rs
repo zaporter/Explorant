@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use procmaps::Map;
 use serde::{Serialize,Deserialize};
@@ -41,19 +41,31 @@ pub_struct!(GeneralInfoResponse {
 pub_struct!(ScreenshotCaptures {
     
 });
-pub_struct!(FrameTimeRange {
-    frame_time_start:usize,
-    frame_time_end:usize,
+pub_struct!(TimeRange {
+    start:TimeStamp,
+    end:TimeStamp,
 });
 
-// pub_struct!(RequestAllP)
+pub_struct!(TimeStamp{
+    frame_time:usize,
+    addr:Option<usize>,
+    instance_of_addr:usize,
+});
 
+pub_struct!(SourceFileRequest{
+    file_name:String,
+});
 
+pub_struct!(SourceFileResponse{
+    data:String,
+});
 
+pub_struct!(GetFunctionData{
+    
+});
 pub_struct!(FunctionTimeRangeRequest{
-    range:FrameTimeRange,
+    range:TimeRange,
 });
-
 pub_struct!(FunctionTimeRangeResponse{
     addr_of_called_functions:Vec<usize>,
 });
@@ -79,16 +91,27 @@ pub_struct!(Type {
     demangled_name: String,
 });
 
+pub_struct!(LineLocation{
+    line_num:u32,
+    column_num:u32,
+});
+pub_struct!(FileInfo {
+    functions: Vec<Function>,
+    lines: HashMap<usize,LineLocation>,
+});
+
 pub_struct!(Function{
-    source_file: String,
+    source_file: PathBuf,
     demangled_name: String,
     address: usize,
     size: usize,
-    lines : Vec<Line>
+    start_line: u32, 
+    end_line: u32,
 });
 
+
 pub_struct!(FunctionExecutionHeatMapRequest{
-    range:FrameTimeRange,
+    range:TimeRange,
     function_address: usize,
 });
 pub_struct!(FrameExecutionHeatMapResponse{

@@ -9,7 +9,7 @@ use object::{
     Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, Section, SectionKind, Segment
 };
 
-use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::FrameTimeMap};
+use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::FrameTimeMap, erebor::Erebor};
 
 pub struct Simulation{
     pub bin_interface : Mutex<BinaryInterface>,
@@ -19,6 +19,7 @@ pub struct Simulation{
     // pub symbol_table: Mutex<Vec<(String, object::Symbol<'static,'static>)>>,
     pub last_rip: Mutex<usize>,
     pub save_directory : PathBuf,
+    pub dwarf_data : Erebor,
 }
 // SAFETY: const *cxx:void is not send and sync
 // because if a thread context switches while running
@@ -81,22 +82,9 @@ impl Simulation {
 
         let symbol_str = std::fs::read(symbol_file).unwrap();
         let obj_file = object::File::parse(&*symbol_str).unwrap();
-        // let symbols = get_symbols(&obj_file).unwrap();
-        let context = addr2line::Context::new(&obj_file).unwrap();
-        // let mut symbols = Vec::new();
-        for symbol in obj_file.symbol_table().ok_or("No symboltable found").unwrap().symbols() {
-            let name : String = Name::from(symbol.name().unwrap()).try_demangle(DemangleOptions::name_only()).to_string();
-            //symbols.push((name, symbol));
-            dbg!((name,&symbol));
-            if let Ok(Some(k)) = context.find_location(symbol.address()) {
-                dbg!(k.file);
-                dbg!(k.line);
-                dbg!(k.column);
-                //dbg!(k.unwrap().line);
-                
-            }
-            //log::info!("{}",context.find_location(symbol.address()).unwrap());
-        }
+        // 
+        let dwarf_data = Erebor::new(obj_file);
+
         let frame_time_map : FrameTimeMap= {
             let file = std::fs::File::open(directory.join("frame_time_map.json"))?;
             let reader = std::io::BufReader::new(file);
@@ -113,6 +101,7 @@ impl Simulation {
             frame_time_map: Mutex::new(frame_time_map),
             last_rip: Mutex::new(rip),
             save_directory: directory,
+            dwarf_data,
             // symbol_table:Mutex::new(symbols),
         })
 

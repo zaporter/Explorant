@@ -8,15 +8,17 @@ edition = "2021"
 [dependencies]
 # librr_rs = {git="https://github.com/zaporter/librr_rs"}
 
+fallible-iterator = { version = "0.2.0"}
 actix-web = "4"
+regex = "1"
+typed-arena = "2"
 actix-files = "0.6"
 actix-cors = "0.6.2"
 dirs="4"
 anyhow={version="1.0",features=["backtrace"]}
 serde_json="1.0"
-addr2line="0.18"
 log = "0.4"
-
+gimli = "0.26.2"
 librr_rs = {path="../librr_rs/"}
 druid_graphviz_layout = {path="../druid_graphviz_layout/"}
 serial_test = "0.8.0"

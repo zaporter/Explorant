@@ -43,6 +43,7 @@ mod shared_structs;
 mod simulation;
 mod trampoline;
 mod mvp;
+mod erebor;
 use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
