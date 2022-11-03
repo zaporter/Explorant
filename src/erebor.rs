@@ -1,8 +1,5 @@
-
-use crate::shared_structs::{Function, FileInfo};
-use object::{
-    Object, ObjectSection, ObjectSymbol, ObjectSymbolTable,  SectionKind, Segment,
-};
+use crate::shared_structs::{FileInfo, Function, LineLocation};
+use object::{Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, SectionKind, Segment};
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
 
@@ -10,9 +7,9 @@ use fallible_iterator::FallibleIterator;
 
 use gimli::{Section, UnitHeader, UnitOffset, UnitSectionOffset, UnitType, UnwindSection};
 use regex::bytes::Regex;
-use std::borrow::{Borrow, Cow, BorrowMut};
+use std::borrow::{Borrow, BorrowMut, Cow};
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::{self, Debug};
 use std::fs;
@@ -37,7 +34,8 @@ use typed_arena::Arena;
 //
 #[derive(Debug, Clone)]
 pub struct Erebor {
-    files: HashMap<PathBuf, FileInfo>,
+    pub files: HashMap<PathBuf, FileInfo>,
+    pub lines: BTreeMap<usize, LineLocation>,
 }
 
 impl Erebor {
@@ -45,7 +43,10 @@ impl Erebor {
         // let mut functions = HashMap::<PathBuf, Function>::new();
         // let symbols = get_symbols(&obj_file).unwrap();
         // let mut symbols = Vec::new();
-        let mut me = Self{ files: HashMap::new() };
+        let mut me = Self {
+            files: HashMap::new(),
+            lines: BTreeMap::new(),
+        };
         read_file(&obj_file, &mut me);
         //for symbol in obj_file
         //    .symbol_table()
@@ -61,52 +62,8 @@ impl Erebor {
         //    if symbol.size() == 0 {
         //        continue;
         //    }
-        //    // let start_loc = match context.find_location(symbol.address()) {
-        //    //     Ok(Some(k)) => k,
-        //    //     _ => continue,
-        //    // };
-        //    // let end_loc = match context.find_location(symbol.address() + symbol.size() - 1) {
-        //    //     Ok(Some(k)) => k,
-        //    //     _ => continue,
-        //    // };
-        //    // // No symbol should span multiple files
-        //    // if start_loc.file != end_loc.file {
-        //    //     log::warn!(
-        //    //         "Symbol {} spanning multiple files ({:?}:{:?} vs {:?}:{:?})",
-        //    //         name,
-        //    //         start_loc.file,
-        //    //         start_loc.line,
-        //    //         end_loc.file,
-        //    //         end_loc.line
-        //    //     );
-        //    //     continue;
-        //    // }
-        //    // let start_line = match start_loc.line {
-        //    //     Some(k) => k,
-        //    //     _ => continue,
-        //    // };
-        //    // let end_line = match end_loc.line {
-        //    //     Some(k) => k,
-        //    //     _ => continue,
-        //    // };
-        //    // let file = match start_loc.file {
-        //    //     Some(k) => PathBuf::from(k),
-        //    //     _ => continue,
-        //    // };
-
-        //    // functions.insert(
-        //    //     file.clone(),
-        //    //     Function {
-        //    //         source_file: file,
-        //    //         demangled_name: name,
-        //    //         address: symbol.address() as usize,
-        //    //         size: symbol.size() as usize,
-        //    //         start_line,
-        //    //         end_line,
-        //    //     },
-        //    // );
         //}
-        dbg!(&me);
+        // dbg!(&me);
 
         me
     }
@@ -173,7 +130,6 @@ impl From<object::read::Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
-
 
 trait Reader: gimli::Reader<Offset = usize> + Send + Sync {}
 
@@ -393,7 +349,7 @@ struct Flags<'a> {
     raw: bool,
     match_units: Option<Regex>,
 }
-fn read_file(file : &object::File, erebor: &mut Erebor){
+fn read_file(file: &object::File, erebor: &mut Erebor) {
     let endian = if file.is_little_endian() {
         gimli::RunTimeEndian::Little
     } else {
@@ -457,13 +413,17 @@ fn load_file_section<'input, 'arena, Endian: gimli::Endianity>(
     })
 }
 
-fn dump_file<Endian>(file: &object::File, endian: Endian, flags: &Flags, erebor: &mut Erebor) -> Result<()>
+fn dump_file<Endian>(
+    file: &object::File,
+    endian: Endian,
+    flags: &Flags,
+    erebor: &mut Erebor,
+) -> Result<()>
 where
     Endian: gimli::Endianity + Send + Sync,
 {
     let arena_data = Arena::new();
     let arena_relocations = Arena::new();
-
 
     let mut load_section = |id: gimli::SectionId| -> Result<_> {
         load_file_section(
@@ -493,7 +453,6 @@ where
     w.flush()?;
     Ok(())
 }
-
 
 fn dump_pointer<W: Write>(w: &mut W, p: gimli::Pointer) -> Result<()> {
     match p {
@@ -698,7 +657,6 @@ fn dump_cfi_instructions<R: Reader, W: Write>(
     }
 }
 
-
 fn dump_info<R: Reader, W: Write + Send>(
     w: &mut W,
     dwarf: &gimli::Dwarf<R>,
@@ -823,7 +781,7 @@ fn dump_unit<R: Reader, W: Write>(
         }
     }
 
-    let entries_result = dump_entries(w, unit, dwarf, flags,erebor);
+    let entries_result = dump_entries(w, unit, dwarf, flags, erebor);
     if let Err(err) = entries_result {
         writeln_error(w, dwarf, err, "Failed to dump entries")?;
     }
@@ -878,25 +836,18 @@ fn dump_entries<R: Reader, W: Write>(
         } else {
             2
         };
-        // write_offset(w, &unit, offset, flags)?;
         let tag = abbrev.map(|x| x.tag()).unwrap_or(gimli::DW_TAG_null);
         if tag == gimli::DW_TAG_subprogram {
-
-            writeln!(
-                w,
-                "{}subprogram:{}",
-                spaces(&mut spaces_buf, indent),
-                tag
-            )?;
-            let mut source_file : Option<PathBuf>= None;
-            let mut demangled_name : Option<String>= None;
+            writeln!(w, "{}subprogram:{}", spaces(&mut spaces_buf, indent), tag)?;
+            let mut source_file: Option<PathBuf> = None;
+            let mut demangled_name: Option<String> = None;
             let mut address = None;
             let mut size = None;
             let mut start_line = None;
             let mut end_line = None;
             for spec in abbrev.map(|x| x.attributes()).unwrap_or(&[]) {
                 let attr = entries.read_attribute(*spec)?;
-               match attr.name() {
+                match attr.name() {
                     gimli::DW_AT_name => {
                         if let gimli::AttributeValue::DebugStrRef(offset) = attr.value() {
                             if let Ok(s) = dwarf.debug_str.get_str(offset) {
@@ -906,67 +857,58 @@ fn dump_entries<R: Reader, W: Write>(
                             }
                         } else if let gimli::AttributeValue::String(s) = attr.value() {
                             demangled_name = Some(s.to_string_lossy()?.into_owned());
-                        }else {
+                        } else {
                             log::warn!("Unmatched subprogram name attribute in DWARF data");
                         }
-                    },
-                   gimli::DW_AT_decl_file => {
-                       if let gimli::AttributeValue::FileIndex(value) = attr.value() {
-                           source_file = Some(dump_file_index(value, &unit, dwarf)?);
-                       }else {
-                           log::warn!("Unmatched subprogram file attribute in DWARF data");
-                       }
-                   },
-                   gimli::DW_AT_decl_line => {
-                       if let gimli::AttributeValue::Udata(data) = attr.value() {
-                           start_line = Some(data as u32);
-                           end_line = Some(0);
-                       }else {
-                           log::warn!("Unmatched subprogram line attribute in DWARF data");
-                       }
-                   },
-                   gimli::DW_AT_decl_column => {
-                       //Udata like above
-                   },
-                   gimli::DW_AT_low_pc => {
-                           writeln!(w,"I hate print debugging");
-                       if let gimli::AttributeValue::Addr(tmp_address) = attr.value() {
-                           address = Some(tmp_address as usize);
-                       }else {
-                           writeln!(w,"FUUUCKJKK");
-                           log::warn!("Unmatched subprogram low_pc attribute in DWARF data");
-                       }
-                        
-                   },
-                   gimli::DW_AT_high_pc => {
-                       if let gimli::AttributeValue::Udata(data) = attr.value() {
-                           size = Some(data as usize);
-                       }else {
-                           log::warn!("Unmatched subprogram high_pc attribute in DWARF data");
-                       }
-                   },
-                   _ => {},
-               }
+                    }
+                    gimli::DW_AT_decl_file => {
+                        if let gimli::AttributeValue::FileIndex(value) = attr.value() {
+                            source_file = Some(dump_file_index(value, &unit, dwarf)?);
+                        } else {
+                            log::warn!("Unmatched subprogram file attribute in DWARF data");
+                        }
+                    }
+                    gimli::DW_AT_decl_line => {
+                        if let gimli::AttributeValue::Udata(data) = attr.value() {
+                            start_line = Some(data as u32);
+                            end_line = Some(0);
+                        } else {
+                            log::warn!("Unmatched subprogram line attribute in DWARF data");
+                        }
+                    }
+                    gimli::DW_AT_decl_column => {
+                        //Udata like above
+                    }
+                    gimli::DW_AT_low_pc => {
+                        if let gimli::AttributeValue::Addr(tmp_address) = attr.value() {
+                            address = Some(tmp_address as usize);
+                        } else {
+                            log::warn!("Unmatched subprogram low_pc attribute in DWARF data");
+                        }
+                    }
+                    gimli::DW_AT_high_pc => {
+                        if let gimli::AttributeValue::Udata(data) = attr.value() {
+                            size = Some(data as usize);
+                        } else {
+                            log::warn!("Unmatched subprogram high_pc attribute in DWARF data");
+                        }
+                    }
+                    _ => {}
+                }
             }
 
-            // writeln!(w,"{:?}", &source_file);
-            // writeln!(w,"{:?}", &demangled_name);
-            // writeln!(w,"{:?}", &address);
-            // writeln!(w,"{:?}", &size);
-            // writeln!(w,"{:?}", &start_line);
-            // writeln!(w,"{:?}", &end_line);
-            
-            if source_file.is_none() ||
-                demangled_name.is_none() || 
-                    address.is_none() ||
-                    size.is_none() ||
-                    start_line.is_none() ||
-                    end_line.is_none() {
+            if source_file.is_none()
+                || demangled_name.is_none()
+                || address.is_none()
+                || size.is_none()
+                || start_line.is_none()
+                || end_line.is_none()
+            {
                 continue;
             }
             let source_file = source_file.unwrap();
 
-            let function = Function{
+            let function = Function {
                 source_file: source_file.clone(),
                 demangled_name: demangled_name.unwrap(),
                 address: address.unwrap(),
@@ -974,11 +916,13 @@ fn dump_entries<R: Reader, W: Write>(
                 start_line: start_line.unwrap(),
                 end_line: end_line.unwrap(),
             };
-            let mut file_info :FileInfo = erebor.files.remove(&source_file).unwrap_or(FileInfo { functions: Vec::new(), lines: HashMap::new() });
+            let mut file_info: FileInfo = erebor
+                .files
+                .remove(&source_file)
+                .unwrap_or(FileInfo::default());
             file_info.functions.push(function);
             erebor.files.insert(source_file, file_info);
-        }
-        else {
+        } else {
             // write!(w, "<{}m:{}>", if depth < 10 { " " } else { "" }, depth)?;
             // write_offset(w, &unit, offset, flags)?;
             // writeln!(
@@ -995,21 +939,21 @@ fn dump_entries<R: Reader, W: Write>(
 
             for spec in abbrev.map(|x| x.attributes()).unwrap_or(&[]) {
                 let attr = entries.read_attribute(*spec)?;
-            //     w.write_all(spaces(&mut spaces_buf, indent).as_bytes())?;
-            //     if let Some(n) = attr.name().static_string() {
-            //         let right_padding = 27 - std::cmp::min(27, n.len());
-            //         write!(w, "k:{}{} ", n, spaces(&mut spaces_buf, right_padding))?;
-            //     } else {
-            //         write!(w, "{:27} ", attr.name())?;
-            //     }
-            //     if flags.raw {
-            //         writeln!(w, "{:?}", attr.raw_value())?;
-            //     } else {
-            //         match dump_attr_value(w, &attr, &unit, dwarf) {
-            //             Ok(_) => (),
-            //             Err(err) => writeln_error(w, dwarf, err, "Failed to dump attribute value")?,
-            //         };
-            //     }
+                //     w.write_all(spaces(&mut spaces_buf, indent).as_bytes())?;
+                //     if let Some(n) = attr.name().static_string() {
+                //         let right_padding = 27 - std::cmp::min(27, n.len());
+                //         write!(w, "k:{}{} ", n, spaces(&mut spaces_buf, right_padding))?;
+                //     } else {
+                //         write!(w, "{:27} ", attr.name())?;
+                //     }
+                //     if flags.raw {
+                //         writeln!(w, "{:?}", attr.raw_value())?;
+                //     } else {
+                //         match dump_attr_value(w, &attr, &unit, dwarf) {
+                //             Ok(_) => (),
+                //             Err(err) => writeln_error(w, dwarf, err, "Failed to dump attribute value")?,
+                //         };
+                //     }
             }
         }
     }
@@ -1249,9 +1193,12 @@ fn dump_attr_value<R: Reader, W: Write>(
             writeln!(w, "{}", value)?;
         }
         gimli::AttributeValue::FileIndex(value) => {
-            write!(w, "0x{:08x} : {}", value,
+            write!(
+                w,
+                "0x{:08x} : {}",
+                value,
                 dump_file_index(value, unit, dwarf)?.to_string_lossy()
-                )?;
+            )?;
             writeln!(w)?;
         }
         gimli::AttributeValue::DwoId(value) => {
@@ -1291,12 +1238,16 @@ fn dump_file_index<R: Reader>(
         let directory = directory.to_string_lossy()?;
         if file.directory_index() != 0 && !directory.starts_with('/') {
             if let Some(ref comp_dir) = unit.comp_dir {
-                file_name.push_str(&format!("{}/",comp_dir.to_string_lossy()?));
+                file_name.push_str(&format!("{}/", comp_dir.to_string_lossy()?));
             }
         }
-        file_name.push_str(&format!("{}/",directory));
+        file_name.push_str(&format!("{}/", directory));
     }
-    file_name.push_str(&dwarf.attr_string(unit, file.path_name())?.to_string_lossy()?);
+    file_name.push_str(
+        &dwarf
+            .attr_string(unit, file.path_name())?
+            .to_string_lossy()?,
+    );
     Ok(PathBuf::from(file_name))
 }
 
@@ -1753,7 +1704,11 @@ fn dump_range_list<R: Reader, W: Write>(
     Ok(())
 }
 
-fn dump_line<R: Reader, W: Write>(w: &mut W, dwarf: &gimli::Dwarf<R>, erebor: &mut Erebor) -> Result<()> {
+fn dump_line<R: Reader, W: Write>(
+    w: &mut W,
+    dwarf: &gimli::Dwarf<R>,
+    erebor: &mut Erebor,
+) -> Result<()> {
     let mut iter = dwarf.units();
     while let Some(header) = iter.next()? {
         // writeln!(
@@ -1952,38 +1907,55 @@ fn dump_line_program<R: Reader, W: Write>(
                 file_index = row.file_index();
                 if let Some(file) = row.file(header) {
                     let path = if let Some(directory) = file.directory(header) {
-                        let path = format!("{}/{}",
+                        let path = format!(
+                            "{}/{}",
                             dwarf.attr_string(unit, directory)?.to_string_lossy()?,
                             dwarf
                                 .attr_string(unit, file.path_name())?
                                 .to_string_lossy()?
-                            );
-                            path
-                        
+                        );
+                        path
                     } else {
                         dwarf
                             .attr_string(unit, file.path_name())?
-                            .to_string_lossy()?.to_string()
+                            .to_string_lossy()?
+                            .to_string()
                     };
                     current_focused_file = Some(PathBuf::from(path.clone()));
-                    write!(
-                        w,
-                        " uri: \"{}\"",
-                        path
-                    )?;
-
+                    write!(w, " uri: \"{}\"", path)?;
                 }
             }
-            let mut lines = erebor.files.entry(current_focused_file.clone().unwrap()).or_insert_with(|| FileInfo{functions: Vec::new(), lines: HashMap::new()}).lines.borrow_mut();
-            lines.insert(row.address() as usize, crate::shared_structs::LineLocation { line_num: line as u32, column_num: column as u32 });
-            
+            // insert the line into the file descriptor object
+            let mut file_info_lines = erebor
+                .files
+                .entry(current_focused_file.clone().unwrap())
+                .or_insert_with(|| FileInfo::default())
+                .lines
+                .borrow_mut();
+            file_info_lines
+                .entry(line as u32)
+                .or_insert_with(|| Vec::new())
+                .push(row.address() as usize);
+            // file_info_lines.insert(line as u32, row.address() as usize);
+            //
+            // insert the line into the erebor lines tree
+
+            let mut lines = erebor.lines.borrow_mut();
+
+            lines.insert(
+                row.address() as usize,
+                LineLocation {
+                    file: current_focused_file.clone().unwrap(),
+                    line_num: line as u32,
+                    column_num: column as u32,
+                },
+            );
 
             writeln!(w)?;
         }
     }
     Ok(())
 }
-
 
 fn dump_aranges<R: Reader, W: Write>(
     w: &mut W,

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::{HashMap, BTreeMap}, path::PathBuf};
 
 use procmaps::Map;
 use serde::{Serialize,Deserialize};
@@ -92,13 +92,23 @@ pub_struct!(Type {
 });
 
 pub_struct!(LineLocation{
+    file: PathBuf,
     line_num:u32,
     column_num:u32,
 });
 pub_struct!(FileInfo {
     functions: Vec<Function>,
-    lines: HashMap<usize,LineLocation>,
+    // stores line_num -> addrs
+    lines: BTreeMap<u32,Vec<usize>>,
 });
+impl Default for FileInfo {
+    fn default() -> Self {
+        Self{
+            functions: Vec::new(),
+            lines: BTreeMap::new(),
+        }
+    }
+}
 
 pub_struct!(Function{
     source_file: PathBuf,
