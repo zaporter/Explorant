@@ -11,6 +11,11 @@ use object::{
 
 use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::FrameTimeMap, erebor::Erebor};
 
+// always aquire the locks in the order
+// that they are present here.
+// Don't move the order of entries in this 
+// struct otherwise you have to update the 
+// lock order across the codebase
 pub struct Simulation{
     pub bin_interface : Mutex<BinaryInterface>,
     pub trampoline_manager : Mutex<TrampolineManager>,
@@ -19,7 +24,7 @@ pub struct Simulation{
     // pub symbol_table: Mutex<Vec<(String, object::Symbol<'static,'static>)>>,
     pub last_rip: Mutex<usize>,
     pub save_directory : PathBuf,
-    pub dwarf_data : Erebor,
+    pub dwarf_data : Mutex<Erebor>,
 }
 // SAFETY: const *cxx:void is not send and sync
 // because if a thread context switches while running
@@ -101,7 +106,7 @@ impl Simulation {
             frame_time_map: Mutex::new(frame_time_map),
             last_rip: Mutex::new(rip),
             save_directory: directory,
-            dwarf_data,
+            dwarf_data: Mutex::new(dwarf_data),
             // symbol_table:Mutex::new(symbols),
         })
 

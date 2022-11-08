@@ -17,6 +17,7 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::sync::Mutex;
 use std::time::SystemTime;
 use std::{error::Error, sync::Arc};
 
@@ -33,6 +34,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 mod block;
+mod address_recorder;
 // mod code_flow_graph;
 // mod graph_layout;
 // mod gui;
@@ -63,8 +65,8 @@ enum Commands {
         save_dir: PathBuf,
     },
     Serve {
-        #[arg(short, long, value_name = "FOLDER")]
-        save_dir: PathBuf,
+        //#[arg(short, long, value_name = "FOLDER1 FOLDER2 ...")]
+        traces: Vec<PathBuf>,
     },
     Mvp {
         #[arg(short, long, value_name = "FOLDER")]
@@ -72,15 +74,18 @@ enum Commands {
     },
 }
 
+struct SimulationStorage {
+    traces: Vec<Simulation>,
+}
 async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
     let req = req.0;
     HttpResponse::Ok().json(PingResponse { id: req.id })
 }
 async fn get_instruction_pointer(
-    data: web::Data<Arc<Simulation>>,
-    _req: web::Json<EmptyRequest>,
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<InstructionPointerRequest>,
 ) -> HttpResponse {
-    let ip = data.get_ref().last_rip.lock();
+    let ip = data.get_ref().traces[req.trace_id].last_rip.lock();
     match ip {
         Ok(instruction_pointer) => HttpResponse::Ok().json(InstructionPointerResponse {
             instruction_pointer: *instruction_pointer,
@@ -89,14 +94,14 @@ async fn get_instruction_pointer(
     }
 }
 async fn get_recorded_frames(
-    data: web::Data<Arc<Simulation>>,
-    _req: web::Json<EmptyRequest>,
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<RecordedFramesRequest>,
 ) -> HttpResponse {
-    let mut frame_time_map = match data.get_ref().frame_time_map.lock() {
+    let mut frame_time_map = match data.get_ref().traces[req.trace_id].frame_time_map.lock() {
         Ok(k) => k,
         Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
     };
-    let save_dir = data.as_ref().save_directory.clone();
+    let save_dir = data.as_ref().traces[req.trace_id].save_directory.clone();
     let to_load: Vec<String> = frame_time_map
         .frames
         .iter()
@@ -112,32 +117,46 @@ async fn get_recorded_frames(
             .insert(frame_name, Vec::new());
     }
     HttpResponse::Ok().json(response)
-
-    // match ip {
-    //     Ok(instruction_pointer) => HttpResponse::Ok().json(InstructionPointerResponse {
-    //         instruction_pointer: *instruction_pointer,
-    //     }),
-    //     Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
-    // }
 }
 async fn get_general_info(
-    data: web::Data<Arc<Simulation>>,
+    data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<EmptyRequest>,
 ) -> HttpResponse {
-    let mut binary_interface = match data.get_ref().bin_interface.lock() {
-        Ok(k) => k,
-        Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
-    };
-    let mut frame_time_map = match data.get_ref().frame_time_map.lock() {
-        Ok(k) => k,
-        Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
-    };
+    let mut traces : Vec<TraceGeneralInfo> = Vec::new();
+    let mut binary_name : Option<String> = None;
+    for (id,simulation) in data.as_ref().traces.iter().enumerate() {
+        let mut binary_interface = match simulation.bin_interface.lock() {
+            Ok(k) => k,
+            Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
+        };
+        if binary_name.is_none() {
+            binary_name = Some(binary_interface.get_exec_file().into());
+        } // TODO ensure binary name is the same across all traces
+        let mut frame_time_map = match simulation.frame_time_map.lock() {
+            Ok(k) => k,
+            Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
+        };
+        traces.push(TraceGeneralInfo { id, frame_time_map: frame_time_map.clone(), proc_maps: binary_interface.get_proc_map().unwrap().to_vec() });
+    }
     let data = GeneralInfoResponse {
-        binary_name: binary_interface.get_exec_file().into(),
-        frame_time_map: frame_time_map.clone(),
-        proc_maps: binary_interface.get_proc_map().unwrap().to_vec(),
+        binary_name : binary_name.unwrap(),
+        traces,
     };
     HttpResponse::Ok().json(data)
+}
+async fn get_current_graph(
+    data: web::Data<Arc<SimulationStorage>>,
+    packet_version : web::Data<Arc<Mutex<usize>>>,
+    _req: web::Json<CurrentGraphRequest>,
+) -> HttpResponse {
+    let mut packet_version = packet_version.get_ref().lock().unwrap();
+    *packet_version+=1;
+    let dot_data = "graph {a;b;}".to_owned();
+    let response : CurrentGraphResponse = CurrentGraphResponse {
+        version : *packet_version,
+        dot: dot_data
+    };
+    HttpResponse::Ok().json(response)
 }
 
 #[actix_web::main]
@@ -154,8 +173,8 @@ async fn main() -> std::io::Result<()> {
             recorder::record(exe, save_dir, None);
             Ok(())
         },
-        Commands::Serve { save_dir } => {
-            return run_server(save_dir.clone()).await;
+        Commands::Serve { traces } => {
+            return run_server(traces.clone()).await;
         },
         Commands::Mvp {save_dir} => {
             mvp::run(save_dir);
@@ -163,8 +182,15 @@ async fn main() -> std::io::Result<()> {
         },
     }
 }
-async fn run_server(save_dir: PathBuf) -> std::io::Result<()> {
-    let simulation: Arc<Simulation> = Arc::new(Simulation::new(save_dir).unwrap());
+async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
+    if traces.len() == 0 {
+        log::error!("You must pass at least one trace");
+        // TODO: Anyhow this with proper msg
+        return Ok(());
+    }
+    let traces = traces.iter().map(|t| Simulation::new(t.clone()).unwrap()).collect();
+    let simulation: Arc<SimulationStorage> = Arc::new(SimulationStorage { traces });
+    let packet_version : Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
     let port = 8080;
     let ip = "127.0.0.1";
     log::info!("Starting HTTP server at {}:{}", &ip, port);
@@ -175,7 +201,8 @@ async fn run_server(save_dir: PathBuf) -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .wrap(Cors::permissive())
             .app_data(web::Data::new(simulation.clone()))
-            .app_data(web::JsonConfig::default().limit(40000096)) // <- limit size of the payload (global configuration)
+            .app_data(web::Data::new(packet_version.clone()))
+            .app_data(web::JsonConfig::default().limit(40000096)) 
             .service(web::resource("/ping").route(web::post().to(ping)))
             .service(
                 web::resource("/instruction_pointer")
@@ -183,6 +210,7 @@ async fn run_server(save_dir: PathBuf) -> std::io::Result<()> {
             )
             .service(web::resource("/general_info").route(web::post().to(get_general_info)))
             .service(web::resource("/recorded_frames").route(web::post().to(get_recorded_frames)))
+            .service(web::resource("/current_graph").route(web::post().to(get_current_graph)))
 
         // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))
         // .service(web::resource("/getsheet").route(web::post().to(get_sheet)))

@@ -15,7 +15,7 @@ macro_rules! pub_struct {
         }
     }
 }
-
+pub type TraceID = usize;
 pub_struct!(PingRequest {
     id:usize
 });
@@ -23,10 +23,16 @@ pub_struct!(PingResponse {
     id:usize 
 });
 pub_struct!(EmptyRequest{});
+pub_struct!(InstructionPointerRequest{
+    trace_id : TraceID,
+});
 pub_struct!(InstructionPointerResponse{
     instruction_pointer:usize,
 });
 
+pub_struct!(RecordedFramesRequest {
+    trace_id : TraceID,
+});
 pub_struct!(RecordedFramesResponse{
     frames: HashMap<String, Vec<u8>>,
 });
@@ -34,8 +40,27 @@ pub_struct!(RecordedFramesResponse{
 pub_struct!(GeneralInfoRequest{});
 pub_struct!(GeneralInfoResponse {
     binary_name: String,
+    traces: Vec<TraceGeneralInfo>,
+});
+
+pub_struct!(TraceGeneralInfo {
+    id : TraceID,
     frame_time_map: FrameTimeMap,
     proc_maps: Vec<Map>,
+});
+
+pub_struct!(GraphNode {
+    name:String,
+    address:usize,
+    node_type: String,
+    node_attributes: HashMap<String,String>,
+
+});
+
+pub_struct!(CurrentGraphRequest {});
+pub_struct!(CurrentGraphResponse {
+    version : usize,
+    dot: String,
 });
 
 pub_struct!(ScreenshotCaptures {
@@ -49,8 +74,17 @@ pub_struct!(TimeRange {
 pub_struct!(TimeStamp{
     frame_time:usize,
     addr:Option<usize>,
-    instance_of_addr:usize,
+    instance_of_addr:Option<usize>,
 });
+impl TimeStamp {
+    pub fn new_at_ft(frame_time: usize) -> Self{
+        Self {
+            frame_time,
+            addr:None,
+            instance_of_addr:None,
+        }
+    }
+}
 
 pub_struct!(SourceFileRequest{
     file_name:String,

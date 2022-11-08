@@ -28,9 +28,7 @@ use typed_arena::Arena;
 // such as DWARF and gimli
 //
 //
-// Erebor utilizes gimli to
-// do dynamic evaluation
-// when possible
+// Erebor utilizes gimli 
 //
 #[derive(Debug, Clone)]
 pub struct Erebor {
@@ -435,7 +433,8 @@ where
             &arena_relocations,
         )
     };
-    let w = &mut BufWriter::new(io::stdout());
+    let w = &mut BufWriter::new(io::sink());
+    // let w = &mut BufWriter::new(io::stdout());
     let mut dwarf = gimli::Dwarf::load(&mut load_section)?;
     let dwo_parent_units = None;
 

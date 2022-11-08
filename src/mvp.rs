@@ -9,7 +9,7 @@ pub fn run(save_dir: &PathBuf) {
     let mut simulation: Simulation = Simulation::new(save_dir.clone()).unwrap();
     let mut addresses = Vec::new();
     let bin_interface = simulation.bin_interface.get_mut().unwrap();
-    let erebor = simulation.dwarf_data;
+    let erebor = simulation.dwarf_data.lock().unwrap();
 
     let step = GdbContAction {
         type_: GdbActionType::ACTION_STEP,

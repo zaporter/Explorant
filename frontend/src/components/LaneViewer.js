@@ -2,32 +2,30 @@ import { Timeline } from 'react-svg-timeline'
 import useRemoteResource from '../util.js';
 
 const LaneViewer = (props) => {
-  let [recordedFrames,_setFrames] = useRemoteResource(null,{},'recorded_frames');
-  let frameTimeMap = props.generalInfo.frame_time_map;
-  let times = frameTimeMap.times;
-  console.log(recordedFrames)
-  
-  let max_frame_time = Math.max(...(Object.keys(times).map(Number)));
-  let min_frame_time = Math.min(...(Object.keys(times).map(Number)));
-  let max_clock_time = times[max_frame_time];
-  let min_clock_time = times[min_frame_time];
-  const laneId = 'execution-lane'
-  const lanes = [
-    {
+  let generalInfo = props.generalInfo;
+  //let [recordedFrames,_setFrames] = useRemoteResource(null,{},'recorded_frames');
+  const lanes = [];
+  const events = [];
+  for (const trace of generalInfo.traces){
+
+    let frameTimeMap = trace.frame_time_map;
+    let times = frameTimeMap.times;
+    //console.log(recordedFrames)
+    
+    let max_frame_time = Math.max(...(Object.keys(times).map(Number)));
+    let min_frame_time = Math.min(...(Object.keys(times).map(Number)));
+    let max_clock_time = times[max_frame_time];
+    let min_clock_time = times[min_frame_time];
+    const laneId = 'execution-lane-'+trace.id;
+    lanes.push({laneId : laneId, label: `Program execution ${trace.id}`})
+    events.push({
+      eventId: `execution-${trace.id}`,
       laneId,
-      label: 'Program Execution',
-    },
-  ]
-  const events = [
-    {
-      eventId: 'execution-1',
-      tooltip: 'Execution',
-      laneId,
-      startTimeMillis: min_clock_time,
-      endTimeMillis: max_clock_time,
-    },
-  ]
-  const dateFormat = (ms) => ms && new Date(Math.ceil(ms)).toISOString();
+      startTimeMillis: 1,
+      endTimeMillis: 1+(max_clock_time-min_clock_time),
+    })
+  } 
+  const dateFormat = (ms) => ms && ms;
   
   return (
     <div>
