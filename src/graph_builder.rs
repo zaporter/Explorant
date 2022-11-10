@@ -56,11 +56,13 @@ impl GraphBuilder {
             return None;
         }
         let addresses = self.address_recorder.get_all_addresses().unwrap();
-        let mut buf = BufWriter::new(Vec::new());
         let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
-    let mut f = File::create("example1.dot").unwrap();
-        // render_to(&mut buf, it.collect());
-        render_to(&mut f, it.collect());
+        let mut buf = BufWriter::new(Vec::new());
+        let mut f = File::create("test.dot").unwrap();
+        render_to(&mut buf, it.collect(), &self.graph_nodes);
+        let addresses = self.address_recorder.get_all_addresses().unwrap();
+        let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
+        render_to(&mut f, it.collect(), &self.graph_nodes);
 
         let bytes = buf.into_inner().unwrap();
         let string = String::from_utf8(bytes).unwrap();
@@ -127,27 +129,44 @@ impl GraphBuilder {
 }
 type Nd = usize;
 type Ed = (usize,usize);
-struct Edges(Vec<Ed>);
+struct Edges<'a>{
+    e_vec: Vec<Ed>,
+    nodes: &'a HashMap<usize, GraphNode>,
+}
 
-pub fn render_to<W: Write>(output: &mut W, e_vec: Vec<Ed>) {
-    let edges = Edges(e_vec);
+pub fn render_to<W: Write>(output: &mut W, mut e_vec: Vec<Ed>, nodes: &HashMap<usize,GraphNode>) {
+    e_vec.sort();
+    e_vec.dedup();
+    let edges = Edges {
+        e_vec,
+        nodes,
+    };
     dot::render(&edges, output).unwrap()
 }
 
-impl<'a> dot::Labeller<'a, Nd, Ed> for Edges {
+impl<'a> dot::Labeller<'a, Nd, Ed> for Edges<'_> {
     fn graph_id(&'a self) -> dot::Id<'a> { dot::Id::new("example1").unwrap() }
 
     fn node_id(&'a self, n: &Nd) -> dot::Id<'a> {
         dot::Id::new(format!("N{}", *n)).unwrap()
     }
+    fn node_label(&'a self, n: &Nd) -> dot::LabelText<'a> {
+        let node = self.nodes.get(n);
+        let name = if let Some(node) = node {
+            &node.name
+        }else {
+            "Error!"
+        };
+        dot::LabelText::LabelStr(name.into())
+    }
 }
 
-impl<'a> dot::GraphWalk<'a, Nd, Ed> for Edges {
+impl<'a> dot::GraphWalk<'a, Nd, Ed> for Edges<'_> {
     fn nodes(&self) -> dot::Nodes<'a,Nd> {
         // (assumes that |N| \approxeq |E|)
-        let &Edges(ref v) = self;
-        let mut nodes = Vec::with_capacity(v.len());
-        for &(s,t) in v {
+        let &Edges{ref e_vec,..}= self;
+        let mut nodes = Vec::with_capacity(e_vec.len());
+        for &(s,t) in e_vec {
             nodes.push(s); nodes.push(t);
         }
         nodes.sort();
@@ -156,8 +175,8 @@ impl<'a> dot::GraphWalk<'a, Nd, Ed> for Edges {
     }
 
     fn edges(&'a self) -> dot::Edges<'a,Ed> {
-        let &Edges(ref edges) = self;
-        Cow::Borrowed(&edges[..])
+        let &Edges{ref e_vec,..}= self;
+        Cow::Borrowed(&e_vec[..])
     }
 
     fn source(&self, e: &Ed) -> Nd { e.0 }

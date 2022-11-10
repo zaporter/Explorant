@@ -13,21 +13,7 @@ pub fn run(save_dir: &PathBuf) {
     // let mut addresses = Vec::new();
     let mut bin_interface = simulation.bin_interface.get_mut().unwrap();
     let erebor = simulation.dwarf_data.lock().unwrap();
-    let mut g_builder = GraphBuilder::new(10000);
-
-    let malloc_path = PathBuf::from("/home/zack/Tools/MQP/glibc2/malloc/malloc.c");
-    let malloc_file_info = erebor.files.get(&malloc_path).unwrap();
-    for func in &malloc_file_info.functions {
-        let node = GraphNode {
-            name: func.demangled_name.clone(),
-            address: func.address,
-            node_type: "entry".to_owned(),
-            node_attributes: HashMap::new(),
-        };
-        g_builder.insert_graph_node(node);
-    }
-
-    g_builder.prepare(&mut bin_interface);
+    let g_builder = simulation.graph_builder.lock().unwrap();
     let result = g_builder.get_graph_as_dot().unwrap();
     dbg!(result);
 

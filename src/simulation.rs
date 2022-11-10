@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Mutex, error::Error};
+use std::{path::PathBuf, sync::Mutex, error::Error, collections::HashMap};
 
 use librr_rs::{BinaryInterface,GdbRegister};
 use procmaps::Map;
@@ -8,8 +8,11 @@ use symbolic_demangle::{Demangle, DemangleOptions};
 use object::{
     Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, Section, SectionKind, Segment
 };
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 
-use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::FrameTimeMap, erebor::Erebor};
+use crate::main;
+use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::{FrameTimeMap, GraphNode}, erebor::Erebor, graph_builder::GraphBuilder};
 
 // always aquire the locks in the order
 // that they are present here.
@@ -25,6 +28,7 @@ pub struct Simulation{
     pub last_rip: Mutex<usize>,
     pub save_directory : PathBuf,
     pub dwarf_data : Mutex<Erebor>,
+    pub graph_builder: Mutex<GraphBuilder>,
 }
 // SAFETY: const *cxx:void is not send and sync
 // because if a thread context switches while running
@@ -98,6 +102,82 @@ impl Simulation {
         };
 
         let trampoline_manager = TrampolineManager::new(&mut bin_interface, stack_info, &proc_map);
+        let max_ft = frame_time_map.times.keys().max().unwrap();
+
+        let mut g_builder = GraphBuilder::new((*max_ft) as usize);
+        {
+        let malloc_path = PathBuf::from("/home/zack/Tools/MQP/glibc2/malloc/malloc.c");
+        let malloc_file_info = dwarf_data.files.get(&malloc_path).unwrap();
+        for func in &malloc_file_info.functions {
+            let node = GraphNode {
+                name: func.demangled_name.clone(),
+                address: func.address,
+                node_type: "entry".to_owned(),
+                node_attributes: HashMap::new(),
+            };
+            g_builder.insert_graph_node(node);
+        }
+        }
+        {
+            let main_path = PathBuf::from("/home/zack/Tools/MQP/glibcbuild/install/test_mmap.c");
+            let main_file_info = dwarf_data.files.get(&main_path).unwrap();
+            let file = File::open(&main_path)?;
+            let reader = BufReader::new(file);
+
+            'outer: for (line_num,line) in reader.lines().enumerate() {
+                let line = line?;
+                if line.contains("PLACEHOLDER_KEY_1") {
+                    for (l_n,v_n) in &main_file_info.lines {
+                        if *l_n as usize >= line_num {
+                            println!("{:?}", v_n);
+                            let node = GraphNode {
+                                name: "PLACEHOLDER_KEY_1".into(),
+                                address: v_n[0],
+                                node_type: "entry".to_owned(),
+                                node_attributes: HashMap::new(),
+                            };
+                            g_builder.insert_graph_node(node);
+                            continue 'outer;
+                            
+                        }
+                    }
+                }
+                if line.contains("PLACEHOLDER_KEY_2") {
+                    for (l_n,v_n) in &main_file_info.lines {
+                        if *l_n as usize >= line_num {
+                            println!("{:?}", v_n);
+                            let node = GraphNode {
+                                name: "PLACEHOLDER_KEY_2".into(),
+                                address: v_n[0],
+                                node_type: "entry".to_owned(),
+                                node_attributes: HashMap::new(),
+                            };
+                            g_builder.insert_graph_node(node);
+                            continue 'outer;
+                            
+                        }
+                    }
+                }
+                if line.contains("PLACEHOLDER_KEY_3") {
+                    for (l_n,v_n) in &main_file_info.lines {
+                        if *l_n as usize >= line_num {
+                            println!("{:?}", v_n);
+                            let node = GraphNode {
+                                name: "PLACEHOLDER_KEY_3".into(),
+                                address: v_n[0],
+                                node_type: "entry".to_owned(),
+                                node_attributes: HashMap::new(),
+                            };
+                            g_builder.insert_graph_node(node);
+                            continue 'outer;
+                            
+                        }
+                    }
+                }
+            }
+        }
+
+        g_builder.prepare(&mut bin_interface);
 
         Ok(Self{
             bin_interface: Mutex::new(bin_interface),
@@ -107,6 +187,7 @@ impl Simulation {
             last_rip: Mutex::new(rip),
             save_directory: directory,
             dwarf_data: Mutex::new(dwarf_data),
+            graph_builder:Mutex::new(g_builder),
             // symbol_table:Mutex::new(symbols),
         })
 

@@ -153,7 +153,11 @@ async fn get_current_graph(
 ) -> HttpResponse {
     let mut packet_version = packet_version.get_ref().lock().unwrap();
     *packet_version+=1;
-    let dot_data = "graph {a;b;}".to_owned();
+
+    let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    let dot_data = graph_builder.get_graph_as_dot().unwrap();
+    dbg!(&dot_data);
+    dbg!(&data.get_ref().traces.len());
     let response : CurrentGraphResponse = CurrentGraphResponse {
         version : *packet_version,
         dot: dot_data
