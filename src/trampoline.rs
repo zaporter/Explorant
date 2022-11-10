@@ -6,10 +6,10 @@ use iced_x86::{
 use librr_rs::*;
 use procmaps::Map;
 use rust_lapper::{Interval, Lapper};
-use std::{collections::HashMap, error::Error, time::SystemTime, fmt};
+use std::{collections::HashMap, error::Error, fmt, time::SystemTime};
 
-use procmaps::Path::MappedFile;
 use iced_x86::code_asm;
+use procmaps::Path::MappedFile;
 
 /**
  * The trampoline stack is meant to store
@@ -46,7 +46,9 @@ impl TrampolineStackInfo {
         let bytes = (self.base_addr + self.size).to_le_bytes().to_vec();
         bin_interface.set_bytes(self.base_addr, bytes)?;
 
-        bin_interface.pin_mut().set_byte(self.base_addr+self.reserved_space, 0x90);
+        bin_interface
+            .pin_mut()
+            .set_byte(self.base_addr + self.reserved_space, 0x90);
         Ok(())
     }
 }
@@ -71,11 +73,11 @@ pub struct TrampolineHeapInfo {
 impl fmt::Debug for TrampolineHeapInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TrampolineHeapInfo")
-         .field("base_addr", &self.base_addr)
-         .field("size", &self.size)
-         .field("bytes_used", &self.bytes_used)
-         .field("num_allocations", &self.allocations.len())
-         .finish()
+            .field("base_addr", &self.base_addr)
+            .field("size", &self.size)
+            .field("bytes_used", &self.bytes_used)
+            .field("num_allocations", &self.allocations.len())
+            .finish()
     }
 }
 impl TrampolineHeapInfo {
@@ -107,9 +109,9 @@ pub struct TrampolineManager {
 impl fmt::Debug for TrampolineManager {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TrampolineManager")
-         .field("stack_info:", &self.stack_info)
-         .field("trampoline_maps:",&self.trampoline_maps)
-         .finish()
+            .field("stack_info:", &self.stack_info)
+            .field("trampoline_maps:", &self.trampoline_maps)
+            .finish()
     }
 }
 impl TrampolineManager {
@@ -122,12 +124,13 @@ impl TrampolineManager {
         for map in maps.iter() {
             if map.val.perms.readable && map.val.perms.executable && !map.val.perms.writable {
                 if let MappedFile(path) = &map.val.pathname {
-                    if path.contains("librrpage.so"){
+                    if path.contains("librrpage.so") {
                         continue;
                     }
                 }
-                let heap_info = TrampolineManager::create_heap_for_map(bin_interface, &map.val, maps);
-                trampoline_maps.insert(map.val.clone(),heap_info);
+                let heap_info =
+                    TrampolineManager::create_heap_for_map(bin_interface, &map.val, maps);
+                trampoline_maps.insert(map.val.clone(), heap_info);
             }
         }
         TrampolineManager {
@@ -147,7 +150,6 @@ impl TrampolineManager {
         target: &Map,
         maps: &Lapper<usize, Map>,
     ) -> TrampolineHeapInfo {
-
         let heap_possible_bottom = target.ceiling.checked_sub(2_usize.pow(30)).unwrap_or(0);
         let heap_possible_top = target.base + 2_usize.pow(30);
         let heap_size = 0x10000000;
@@ -158,13 +160,12 @@ impl TrampolineManager {
             base_addr: heap_base,
             size: heap_size,
             bytes_used: 0,
-            unwatched_instructions:Vec::new(),
+            unwatched_instructions: Vec::new(),
             allocations: Lapper::new(vec![]),
         };
         heap_info.allocate_map(bin_interface);
         heap_info
     }
-
 
     pub fn recorded_addresses(&self) -> &Vec<usize> {
         &self.recorded_addresses
@@ -173,19 +174,19 @@ impl TrampolineManager {
         &mut self,
         bin_interface: &mut BinaryInterface,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO: 
-        // increase the vec capacity before this program runs 
-        // to ensure we don't have to reallocate halfway through 
+        // TODO:
+        // increase the vec capacity before this program runs
+        // to ensure we don't have to reallocate halfway through
         // each insert
         let stack_end_addr = self.stack_info.base_addr + self.stack_info.size;
         let rsp_bytes = bin_interface.get_mem(self.stack_info.base_addr, 8);
         let rsp = usize::from_le_bytes(rsp_bytes.try_into().unwrap());
-        let mut bytes = bin_interface.get_mem(rsp,stack_end_addr-rsp);
+        let mut bytes = bin_interface.get_mem(rsp, stack_end_addr - rsp);
         bytes.reverse();
         // we reverse it so that when reading, we read the last thing
-        // added first. That also means that we have to read as be 
+        // added first. That also means that we have to read as be
         // bytes
-        for be_num_bytes in bytes.chunks(8){
+        for be_num_bytes in bytes.chunks(8) {
             self.recorded_addresses
                 .push(usize::from_be_bytes(be_num_bytes.try_into().unwrap()));
         }
@@ -231,15 +232,19 @@ impl TrampolineManager {
         }
         instructions
     }
-    pub fn create_trampolines(&mut self, bin_interface: &mut BinaryInterface) ->Result<(), Box<dyn Error>>{
-        self.trampoline_maps.iter_mut().map(|(map, heap)| 
-            {
-            Self::create_trampolines_for_map(&self.stack_info, bin_interface, map,  heap).unwrap();
-            (map,heap)
-            }
-            ).count();
+    pub fn create_trampolines(
+        &mut self,
+        bin_interface: &mut BinaryInterface,
+    ) -> Result<(), Box<dyn Error>> {
+        self.trampoline_maps
+            .iter_mut()
+            .map(|(map, heap)| {
+                Self::create_trampolines_for_map(&self.stack_info, bin_interface, map, heap)
+                    .unwrap();
+                (map, heap)
+            })
+            .count();
         Ok(())
-        
     }
     fn create_trampolines_for_map(
         stack_info: &TrampolineStackInfo,
@@ -247,11 +252,12 @@ impl TrampolineManager {
         map: &Map,
         heap: &mut TrampolineHeapInfo,
     ) -> Result<(), Box<dyn Error>> {
-        let instructions = Self::read_instructions(bin_interface, map.base+32, map.ceiling-(map.base+32));
+        let instructions =
+            Self::read_instructions(bin_interface, map.base + 32, map.ceiling - (map.base + 32));
         let mut instruction_stack = Vec::new();
         let mut instruction_stack_code_size = 0;
-        let mut added=0;
-        let mut not_added=0;
+        let mut added = 0;
+        let mut not_added = 0;
         for instr in instructions {
             if instr.flow_control() == FlowControl::Next {
                 if instr.code() == Code::Endbr64 {
@@ -262,14 +268,14 @@ impl TrampolineManager {
                 instruction_stack_code_size += instr.len();
                 instruction_stack.push(instr);
             } else {
-                if instr.is_invalid(){
+                if instr.is_invalid() {
                     continue;
                 }
-                if instr.len() >5 /* && !instr.is_ip_rel_memory_operand()*/ && !instr.is_invalid(){
+                if instr.len() >5 /* && !instr.is_ip_rel_memory_operand()*/ && !instr.is_invalid() {
                     Self::insert_trampoline(stack_info, bin_interface, instr, None, heap)?;
-                    added+=1;
-                }else {
-                    not_added+=1;
+                    added += 1;
+                } else {
+                    not_added += 1;
                 }
             }
         }
@@ -319,7 +325,10 @@ impl TrampolineManager {
             }
         }
         if replaced_instruction.len() < jump_bytes_len {
-            return Err(format!("Only given {} but needs {jump_bytes_len} bytes for the jump instruction from main", replaced_instruction.len()))?;
+            return Err(format!(
+                "Only given {} but needs {jump_bytes_len} bytes for the jump instruction from main",
+                replaced_instruction.len()
+            ))?;
         }
         for k in jump_bytes_len..replaced_instruction.len() {
             bin_interface
@@ -354,7 +363,7 @@ impl TrampolineManager {
             start: heap_code_base_addr,
             stop: heap_code_base_addr + heap_trampoline_bytes.len(),
             val: TrampolineInfo {
-                replaced_instructions:vec![replaced_instruction],
+                replaced_instructions: vec![replaced_instruction],
                 trampoline_instructions: Vec::new(),
             },
         });
@@ -428,77 +437,77 @@ impl TrampolineManager {
 
 //        map
 //    }
-    //pub fn patch_jumps_into_trampoline(
-    //    &mut self,
-    //    bin_interface: &mut BinaryInterface,
-    //    possible_vuln_jumps: HashMap<usize, Instruction>,
-    //) {
-    //    for (jump_addr, instr) in possible_vuln_jumps {
-    //        // each jump had better only point into at most
-    //        // one trampoline
-    //        let mut trampoline_iter = self.trampolines.find(jump_addr, jump_addr);
-    //        if let Some(trampoline) = trampoline_iter.next() {
-    //            match instr.flow_control() {
-    //                // Ignore nexts as we always replace the instructions
-    //                // at a previous good location
-    //                FlowControl::Next => {}
-    //                //
-    //                FlowControl::UnconditionalBranch => {
-    //                    if instr.is_jmp_short_or_near() {
-    //                        let mut new_instr = instr.clone();
-    //                        match instr.op0_kind() {
-    //                            OpKind::NearBranch64 => {
-    //                                new_instr.set_near_branch64(trampoline.start as u64);
-    //                            }
-    //                            _ => {
-    //                                todo!()
-    //                            }
-    //                        }
-    //                        self.overwrite_single_instr(bin_interface, &instr, &new_instr)
-    //                            .unwrap();
-    //                    } else {
-    //                        dbg!(instr);
-    //                        todo!();
-    //                    }
-    //                }
-    //                FlowControl::IndirectBranch => {
-    //                    // TODO
-    //                }
-    //                FlowControl::ConditionalBranch => {
-    //                    if instr.is_jcc_short_or_near() {
-    //                        let mut new_instr = instr.clone();
-    //                        match instr.op0_kind() {
-    //                            OpKind::NearBranch64 => {
-    //                                new_instr.set_near_branch64(trampoline.start as u64);
-    //                            }
-    //                            _ => {
-    //                                todo!()
-    //                            }
-    //                        }
-    //                        self.overwrite_single_instr(bin_interface, &instr, &new_instr)
-    //                            .unwrap();
-    //                    } else {
-    //                        dbg!(instr);
-    //                        todo!();
-    //                    }
-    //                }
-    //                // returns are fine because we wont overwrite the calls
-    //                // they are related to
-    //                FlowControl::Return => {}
-    //                // This probably isnt too much of an issue
-    //                // because the start of a call almost
-    //                // certainly wont be overwritten
-    //                FlowControl::Call => {
-    //                    todo!()
-    //                }
-    //                FlowControl::IndirectCall => {
-    //                    todo!()
-    //                }
-    //                // Justification todo
-    //                FlowControl::Interrupt => {}
-    //                FlowControl::XbeginXabortXend => {}
-    //                FlowControl::Exception => {}
-    //            }
-    //        }
-    //    }
-    //}
+//pub fn patch_jumps_into_trampoline(
+//    &mut self,
+//    bin_interface: &mut BinaryInterface,
+//    possible_vuln_jumps: HashMap<usize, Instruction>,
+//) {
+//    for (jump_addr, instr) in possible_vuln_jumps {
+//        // each jump had better only point into at most
+//        // one trampoline
+//        let mut trampoline_iter = self.trampolines.find(jump_addr, jump_addr);
+//        if let Some(trampoline) = trampoline_iter.next() {
+//            match instr.flow_control() {
+//                // Ignore nexts as we always replace the instructions
+//                // at a previous good location
+//                FlowControl::Next => {}
+//                //
+//                FlowControl::UnconditionalBranch => {
+//                    if instr.is_jmp_short_or_near() {
+//                        let mut new_instr = instr.clone();
+//                        match instr.op0_kind() {
+//                            OpKind::NearBranch64 => {
+//                                new_instr.set_near_branch64(trampoline.start as u64);
+//                            }
+//                            _ => {
+//                                todo!()
+//                            }
+//                        }
+//                        self.overwrite_single_instr(bin_interface, &instr, &new_instr)
+//                            .unwrap();
+//                    } else {
+//                        dbg!(instr);
+//                        todo!();
+//                    }
+//                }
+//                FlowControl::IndirectBranch => {
+//                    // TODO
+//                }
+//                FlowControl::ConditionalBranch => {
+//                    if instr.is_jcc_short_or_near() {
+//                        let mut new_instr = instr.clone();
+//                        match instr.op0_kind() {
+//                            OpKind::NearBranch64 => {
+//                                new_instr.set_near_branch64(trampoline.start as u64);
+//                            }
+//                            _ => {
+//                                todo!()
+//                            }
+//                        }
+//                        self.overwrite_single_instr(bin_interface, &instr, &new_instr)
+//                            .unwrap();
+//                    } else {
+//                        dbg!(instr);
+//                        todo!();
+//                    }
+//                }
+//                // returns are fine because we wont overwrite the calls
+//                // they are related to
+//                FlowControl::Return => {}
+//                // This probably isnt too much of an issue
+//                // because the start of a call almost
+//                // certainly wont be overwritten
+//                FlowControl::Call => {
+//                    todo!()
+//                }
+//                FlowControl::IndirectCall => {
+//                    todo!()
+//                }
+//                // Justification todo
+//                FlowControl::Interrupt => {}
+//                FlowControl::XbeginXabortXend => {}
+//                FlowControl::Exception => {}
+//            }
+//        }
+//    }
+//}

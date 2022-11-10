@@ -35,6 +35,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 mod block;
+mod graph_builder;
 mod address_recorder;
 // mod code_flow_graph;
 // mod graph_layout;
