@@ -60,6 +60,15 @@ impl AddressRecorder {
         self.is_writing_ftbin = false;
         // placeholder
     }
+    //TODO test this function
+    pub fn get_all_addresses<'a>(&'a self)->anyhow::Result<AddrIter<'a>> {
+        let mut to_ret = AddrIter::new();
+        for bin in &self.records {
+            to_ret.chunks.push(&bin.addresses);
+        }
+        Ok(to_ret)
+
+    }
     // return a vec of slices to
     // avoid copying large amounts of
     // memory
