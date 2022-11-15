@@ -153,7 +153,7 @@ impl<'a> dot::Labeller<'a, Nd, Ed> for Edges<'_> {
     fn node_label(&'a self, n: &Nd) -> dot::LabelText<'a> {
         let node = self.nodes.get(n);
         let name = if let Some(node) = node {
-            &node.name
+            &node.FQN
         }else {
             "Error!"
         };

@@ -48,13 +48,22 @@ pub_struct!(TraceGeneralInfo {
     frame_time_map: FrameTimeMap,
     proc_maps: Vec<Map>,
 });
-
+pub_struct!(GraphModule{
+    name: String,
+    parent: Option<String>,
+    module_attributes: HashMap<String,String>,
+});
 pub_struct!(GraphNode {
-    name:String,
+    FQN:String,
     address:usize,
     node_type: String,
+    location: LineLocation,
+    labeled_transisitons: Vec<LabeledTransition>,
     node_attributes: HashMap<String,String>,
-
+});
+pub_struct!(LabeledTransition {
+    dest_FQN: String,
+    label: String,
 });
 
 pub_struct!(CurrentGraphRequest {});

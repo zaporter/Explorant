@@ -12,6 +12,7 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
 use crate::main;
+use crate::shared_structs::LineLocation;
 use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::{FrameTimeMap, GraphNode}, erebor::Erebor, graph_builder::GraphBuilder};
 
 // always aquire the locks in the order
@@ -110,10 +111,12 @@ impl Simulation {
         let malloc_file_info = dwarf_data.files.get(&malloc_path).unwrap();
         for func in &malloc_file_info.functions {
             let node = GraphNode {
-                name: func.demangled_name.clone(),
+                FQN: func.demangled_name.clone(),
                 address: func.address,
                 node_type: "entry".to_owned(),
                 node_attributes: HashMap::new(),
+                location: LineLocation { file: "".into(), line_num: 0, column_num: 0 },
+                labeled_transisitons:Vec::new(),
             };
             g_builder.insert_graph_node(node);
         }
@@ -126,46 +129,16 @@ impl Simulation {
 
             'outer: for (line_num,line) in reader.lines().enumerate() {
                 let line = line?;
-                if line.contains("PLACEHOLDER_KEY_1") {
-                    for (l_n,v_n) in &main_file_info.lines {
-                        if *l_n as usize >= line_num {
-                            println!("{:?}", v_n);
-                            let node = GraphNode {
-                                name: "PLACEHOLDER_KEY_1".into(),
-                                address: v_n[0],
-                                node_type: "entry".to_owned(),
-                                node_attributes: HashMap::new(),
-                            };
-                            g_builder.insert_graph_node(node);
-                            continue 'outer;
-                            
-                        }
-                    }
-                }
-                if line.contains("PLACEHOLDER_KEY_2") {
-                    for (l_n,v_n) in &main_file_info.lines {
-                        if *l_n as usize >= line_num {
-                            println!("{:?}", v_n);
-                            let node = GraphNode {
-                                name: "PLACEHOLDER_KEY_2".into(),
-                                address: v_n[0],
-                                node_type: "entry".to_owned(),
-                                node_attributes: HashMap::new(),
-                            };
-                            g_builder.insert_graph_node(node);
-                            continue 'outer;
-                            
-                        }
-                    }
-                }
                 if line.contains("PLACEHOLDER_KEY_3") {
                     for (l_n,v_n) in &main_file_info.lines {
                         if *l_n as usize >= line_num {
                             println!("{:?}", v_n);
                             let node = GraphNode {
-                                name: "PLACEHOLDER_KEY_3".into(),
+                                FQN: "PLACEHOLDER_KEY_3".into(),
                                 address: v_n[0],
                                 node_type: "entry".to_owned(),
+                                location: LineLocation { file: "".into(), line_num: 0, column_num: 0 },
+                                labeled_transisitons:Vec::new(),
                                 node_attributes: HashMap::new(),
                             };
                             g_builder.insert_graph_node(node);

@@ -37,6 +37,7 @@ use serde::{Deserialize, Serialize};
 mod block;
 mod graph_builder;
 mod address_recorder;
+mod file_parsing;
 // mod code_flow_graph;
 // mod graph_layout;
 // mod gui;
