@@ -60,11 +60,13 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                 }
                 Annotation::Event { name } => {
                     let mut event_addr = None;
-                    'addr_search: for offset in 0..1000 {
+                    let mut final_offset = 0;
+                    'addr_search: for offset in 1..1000 {
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.get(0).unwrap());
+                                event_addr = Some(addrs.first().unwrap());
+                                final_offset = offset;
                                 break 'addr_search;
                             }
                         }
@@ -77,7 +79,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         FQN: name,
                         address: *event_addr,
                         node_type: "event".into(),
-                        location: LineLocation { file: file_name.clone(), line_num: line_num as u32, column_num: 0 },
+                        location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
                         labeled_transisitons: Vec::new(),
                         node_attributes: HashMap::new(),
                     });
@@ -85,11 +87,13 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                 Annotation::Flow { name } => {
 
                     let mut event_addr = None;
-                    'addr_search: for offset in 0..1000 {
+                    let mut final_offset = 0;
+                    'addr_search: for offset in 1..1000 {
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.get(0).unwrap());
+                                event_addr = Some(addrs.first().unwrap());
+                                final_offset = offset;
                                 break 'addr_search;
                             }
                         }
@@ -102,7 +106,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         FQN: name,
                         address: *event_addr,
                         node_type: "event".into(),
-                        location: LineLocation { file: file_name.clone(), line_num: line_num as u32, column_num: 0 },
+                        location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
                         labeled_transisitons: Vec::new(),
                         node_attributes: HashMap::new(),
                     });
