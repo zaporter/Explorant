@@ -34,8 +34,6 @@ use typed_arena::Arena;
 pub struct Erebor {
     pub files: HashMap<PathBuf, FileInfo>,
     pub lines: BTreeMap<usize, LineLocation>,
-    pub modules : Vec<GraphModule>,
-    pub nodes : Vec<GraphNode>,
 }
 
 impl Erebor {
@@ -46,8 +44,6 @@ impl Erebor {
         let mut me = Self {
             files: HashMap::new(),
             lines: BTreeMap::new(),
-            nodes:Vec::new(),
-            modules:Vec::new(),
         };
         read_file(&obj_file, &mut me);
         //for symbol in obj_file

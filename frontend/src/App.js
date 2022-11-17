@@ -25,14 +25,16 @@ function App() {
   const [count,_setCount] = useRemoteResource(5,{id:21},'ping');
   const [ip,_setIp] = useRemoteResource(null,{trace_id:0},'instruction_pointer');
   const [generalInfo,_setGeneralInfo] = useRemoteResource(null,{},'general_info');
-  const dot = 'graph{a--b}';
+  const [currentFile, setCurrentFile] = useState("");
   return (
     <div className="App">
-        {generalInfo && <SrcViewer />}
 {/* <Graphviz dot={dot} /> */}
 
-        {generalInfo && <GraphViewer />}
-        {generalInfo && <LaneViewer generalInfo={generalInfo}/>}
+      <div style={{display:"flex", flexDirection:"row", width:"100%", flexBasis:"50%"}}>
+        {generalInfo && <SrcViewer currentFile={currentFile}/>}
+        {generalInfo && <GraphViewer setCurrentFile={setCurrentFile} />}
+        </div>
+          {generalInfo && <LaneViewer generalInfo={generalInfo}/>}
         {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
         <p>{count.id}</p>
         <p>{ip&&ip.instruction_pointer}</p>

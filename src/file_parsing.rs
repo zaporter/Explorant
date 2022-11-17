@@ -6,16 +6,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     erebor::Erebor,
-    shared_structs::{GraphModule, GraphNode, LineLocation},
+    shared_structs::{GraphModule, GraphNode, LineLocation}, graph_builder::GraphBuilder,
 };
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
-pub struct FileNodeParsingResult {}
 
-pub fn parse_annotations(erebor: &mut Erebor) -> anyhow::Result<()> {
+pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> anyhow::Result<()> {
     let mut modules: HashMap<String, GraphModule> = HashMap::new();
-    let mut nodes: Vec<GraphNode> = Vec::new();
+    let mut nodes: HashMap<usize,GraphNode> = HashMap::new();
     // we are not guaranteed to read the files
     // in any particular order so the FQNs of the nodes
     // will actually be their module::name and the
@@ -26,7 +25,11 @@ pub fn parse_annotations(erebor: &mut Erebor) -> anyhow::Result<()> {
         module_attributes: HashMap::new(),
     });
     for (file_name, file_info) in &erebor.files {
-        let file = File::open(file_name)?;
+        let file = File::open(file_name);
+        let Ok(file) = file else {
+            log::warn!("Skipping reading file {} due to an error", file_name.to_string_lossy());
+            continue;
+        };
         let reader = BufReader::new(file);
 
         'line: for (line_num, line) in reader.lines().enumerate() {
@@ -69,21 +72,49 @@ pub fn parse_annotations(erebor: &mut Erebor) -> anyhow::Result<()> {
                     let Some(event_addr) = event_addr else {
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
-                    nodes.push(GraphNode {
+                    log::info!("Registered event {}, ", name);
+                    nodes.insert(*event_addr,GraphNode {
                         FQN: name,
-                        address: 0,
+                        address: *event_addr,
                         node_type: "event".into(),
                         location: LineLocation { file: file_name.clone(), line_num: line_num as u32, column_num: 0 },
                         labeled_transisitons: Vec::new(),
                         node_attributes: HashMap::new(),
                     });
                 }
-                Annotation::Flow { name } => {}
+                Annotation::Flow { name } => {
+
+                    let mut event_addr = None;
+                    'addr_search: for offset in 0..1000 {
+                        let addrs = file_info.lines.get(&((line_num+offset) as u32));
+                        if let Some(addrs) = addrs {
+                            if addrs.len() > 0 {
+                                event_addr = Some(addrs.get(0).unwrap());
+                                break 'addr_search;
+                            }
+                        }
+                    }
+                    let Some(event_addr) = event_addr else {
+                        return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
+                    };
+                    log::info!("Registered event {}, ", name);
+                    nodes.insert(*event_addr,GraphNode {
+                        FQN: name,
+                        address: *event_addr,
+                        node_type: "event".into(),
+                        location: LineLocation { file: file_name.clone(), line_num: line_num as u32, column_num: 0 },
+                        labeled_transisitons: Vec::new(),
+                        node_attributes: HashMap::new(),
+                    });
+                }
             }
         }
     }
-       
-
+    for mut node in &mut nodes.values_mut() {
+        node.FQN = name_to_fqn(&node.FQN, &modules)?;
+    }
+    graph_builder.graph_nodes = nodes;
+    graph_builder.modules = modules;
     Ok(())
 }
 // TODO: prevent infinite recursion with a module having itself 

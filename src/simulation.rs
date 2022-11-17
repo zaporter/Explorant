@@ -11,7 +11,7 @@ use object::{
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
-use crate::main;
+use crate::{main, file_parsing};
 use crate::shared_structs::LineLocation;
 use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::{FrameTimeMap, GraphNode}, erebor::Erebor, graph_builder::GraphBuilder};
 
@@ -106,51 +106,11 @@ impl Simulation {
         let max_ft = frame_time_map.times.keys().max().unwrap();
 
         let mut g_builder = GraphBuilder::new((*max_ft) as usize);
-        {
-        let malloc_path = PathBuf::from("/home/zack/Tools/MQP/glibc2/malloc/malloc.c");
-        let malloc_file_info = dwarf_data.files.get(&malloc_path).unwrap();
-        for func in &malloc_file_info.functions {
-            let node = GraphNode {
-                FQN: func.demangled_name.clone(),
-                address: func.address,
-                node_type: "entry".to_owned(),
-                node_attributes: HashMap::new(),
-                location: LineLocation { file: "".into(), line_num: 0, column_num: 0 },
-                labeled_transisitons:Vec::new(),
-            };
-            g_builder.insert_graph_node(node);
-        }
-        }
-        {
-            let main_path = PathBuf::from("/home/zack/Tools/MQP/glibcbuild/install/test_mmap.c");
-            let main_file_info = dwarf_data.files.get(&main_path).unwrap();
-            let file = File::open(&main_path)?;
-            let reader = BufReader::new(file);
-
-            'outer: for (line_num,line) in reader.lines().enumerate() {
-                let line = line?;
-                if line.contains("PLACEHOLDER_KEY_3") {
-                    for (l_n,v_n) in &main_file_info.lines {
-                        if *l_n as usize >= line_num {
-                            println!("{:?}", v_n);
-                            let node = GraphNode {
-                                FQN: "PLACEHOLDER_KEY_3".into(),
-                                address: v_n[0],
-                                node_type: "entry".to_owned(),
-                                location: LineLocation { file: "".into(), line_num: 0, column_num: 0 },
-                                labeled_transisitons:Vec::new(),
-                                node_attributes: HashMap::new(),
-                            };
-                            g_builder.insert_graph_node(node);
-                            continue 'outer;
-                            
-                        }
-                    }
-                }
-            }
-        }
-
+        file_parsing::parse_annotations(&dwarf_data, &mut g_builder)?;
+        dbg!(&g_builder.graph_nodes);
+        dbg!(&g_builder.modules);
         g_builder.prepare(&mut bin_interface);
+
 
         Ok(Self{
             bin_interface: Mutex::new(bin_interface),

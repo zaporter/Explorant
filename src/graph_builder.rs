@@ -11,6 +11,7 @@ use std::fs::File;
 
 use librr_rs::*;
 use crate::address_recorder::AddrIter;
+use crate::shared_structs::GraphModule;
 use crate::{address_recorder::AddressRecorder, shared_structs::{GraphNode, TimeStamp}, query::node::TimeRange};
 
 // TODO
@@ -21,10 +22,12 @@ use crate::{address_recorder::AddressRecorder, shared_structs::{GraphNode, TimeS
 //
 pub struct GraphBuilder {
     address_recorder : AddressRecorder,
-    graph_nodes : HashMap<usize,GraphNode>,
+    //graph_nodes : HashMap<usize,GraphNode>,
     ranges : Vec<TimeRange>,
     breakpoints : HashSet<usize>,
     is_prepared: bool,
+    pub modules : HashMap<String,GraphModule>,
+    pub graph_nodes : HashMap<usize,GraphNode>,
 }
 
 // Stablize negative f------ trait impls
@@ -39,6 +42,7 @@ impl GraphBuilder {
             ranges: Vec::new(),
             breakpoints: HashSet::new(),
             is_prepared: false,
+            modules: HashMap::new(),
             
         }
     }

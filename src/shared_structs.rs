@@ -65,6 +65,13 @@ pub_struct!(LabeledTransition {
     dest_FQN: String,
     label: String,
 });
+pub_struct!(NodeDataRequest{
+    
+});
+pub_struct!(NodeDataResponse{
+    modules : HashMap<String,GraphModule>,
+    nodes : HashMap<usize,GraphNode>,
+});
 
 pub_struct!(CurrentGraphRequest {});
 pub_struct!(CurrentGraphResponse {

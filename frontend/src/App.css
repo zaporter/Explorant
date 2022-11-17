@@ -23,6 +23,16 @@
   font-size: calc(10px + 2vmin);
   color: white;
 }
+.src-viewer{
+  width:50%;
+}
+.src-inner{
+  height:440px;
+  overflow-y:auto;
+}
+.graph-viewer {
+  width:50%;
+}
 
 .App-link {
   color: #61dafb;

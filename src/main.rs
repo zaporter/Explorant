@@ -1,8 +1,11 @@
 #![allow(unused_imports)]
 #![allow(unused)]
+#![allow(non_snake_case)]
 
 use clap::{Parser, Subcommand};
 use druid_graphviz_layout::adt::dag::NodeHandle;
+use erebor::Erebor;
+use graph_builder::GraphBuilder;
 use iced_x86::{
     Code, ConditionCode, Decoder, DecoderOptions, FlowControl, Instruction, InstructionInfoFactory,
     OpKind, Register, RflagsBits,
@@ -77,8 +80,16 @@ enum Commands {
     },
 }
 
+// ASSUMPTIONS
+// All code is run from the same binary 
+// with ASLR turned off.
+// Anything else is undefined behavior and 
+// will fail silenty. 
 struct SimulationStorage {
     traces: Vec<Simulation>,
+    //dwarf_data: Mutex<Erebor>,
+    //graph_builder: Mutex<GraphBuilder>,
+
 }
 async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
     let req = req.0;
@@ -152,18 +163,43 @@ async fn get_current_graph(
     packet_version : web::Data<Arc<Mutex<usize>>>,
     _req: web::Json<CurrentGraphRequest>,
 ) -> HttpResponse {
-    let mut packet_version = packet_version.get_ref().lock().unwrap();
-    *packet_version+=1;
+    // let mut packet_version = packet_version.get_ref().lock().unwrap();
+    // *packet_version+=1;
 
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let dot_data = graph_builder.get_graph_as_dot().unwrap();
     dbg!(&dot_data);
     dbg!(&data.get_ref().traces.len());
     let response : CurrentGraphResponse = CurrentGraphResponse {
-        version : *packet_version,
+        version : 0,
         dot: dot_data
     };
     HttpResponse::Ok().json(response)
+}
+async fn get_node_data(
+    data: web::Data<Arc<SimulationStorage>>,
+    _req: web::Json<NodeDataRequest>,
+) -> HttpResponse {
+
+    let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    let resp = NodeDataResponse{
+        modules: graph_builder.modules.clone(),
+        nodes: graph_builder.graph_nodes.clone(),
+    };
+    HttpResponse::Ok().json(resp)
+}
+async fn get_source_file(
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<SourceFileRequest>,
+) -> HttpResponse {
+    let req = req.0;
+    // TODO Checks here 
+    let contents = std::fs::read_to_string(req.file_name);
+    let resp = SourceFileResponse {
+        data:contents.unwrap_or("[empty]".into()),
+    };
+    HttpResponse::Ok().json(resp)
+
 }
 
 #[actix_web::main]
@@ -218,6 +254,8 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/general_info").route(web::post().to(get_general_info)))
             .service(web::resource("/recorded_frames").route(web::post().to(get_recorded_frames)))
             .service(web::resource("/current_graph").route(web::post().to(get_current_graph)))
+            .service(web::resource("/node_data").route(web::post().to(get_node_data)))
+            .service(web::resource("/source_file").route(web::post().to(get_source_file)))
 
         // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))
         // .service(web::resource("/getsheet").route(web::post().to(get_sheet)))

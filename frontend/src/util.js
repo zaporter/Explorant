@@ -1,7 +1,7 @@
 
 import React, {useEffect, useState} from 'react';
 
-const useRemoteResource = (defaultVal, requestBody, endpoint) => {
+const useRemoteResource = (defaultVal, requestBody, endpoint, effectHook=[]) => {
   const [count, setCount] = useState(defaultVal);
   const requestOptions = {
     method: 'POST',
@@ -12,7 +12,7 @@ const useRemoteResource = (defaultVal, requestBody, endpoint) => {
     fetch('http://127.0.0.1:8080/'+endpoint,requestOptions)
       .then(response=>response.json())
       .then(data=>setCount(data))
-  },[]);
+  },effectHook);
   return [count,setCount];
 };
 export default useRemoteResource;
