@@ -25,6 +25,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
         module_attributes: HashMap::new(),
     });
     for (file_name, file_info) in &erebor.files {
+        log::info!("reading file {} ", file_name.to_string_lossy());
         let file = File::open(file_name);
         let Ok(file) = file else {
             log::warn!("Skipping reading file {} due to an error", file_name.to_string_lossy());
@@ -65,7 +66,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap());
+                                event_addr = Some(addrs.first().unwrap()+0x555555554000);
                                 final_offset = offset;
                                 break 'addr_search;
                             }
@@ -75,9 +76,9 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
-                    nodes.insert(*event_addr,GraphNode {
+                    nodes.insert(event_addr,GraphNode {
                         FQN: name,
-                        address: *event_addr,
+                        address: event_addr,
                         node_type: "event".into(),
                         location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
                         labeled_transisitons: Vec::new(),
@@ -92,7 +93,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap());
+                                event_addr = Some(addrs.first().unwrap()+0x555555554000);
                                 final_offset = offset;
                                 break 'addr_search;
                             }
@@ -102,9 +103,9 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
-                    nodes.insert(*event_addr,GraphNode {
+                    nodes.insert(event_addr,GraphNode {
                         FQN: name,
-                        address: *event_addr,
+                        address: event_addr,
                         node_type: "event".into(),
                         location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
                         labeled_transisitons: Vec::new(),
