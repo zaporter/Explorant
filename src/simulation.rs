@@ -107,7 +107,7 @@ impl Simulation {
 
         let mut g_builder = GraphBuilder::new((*max_ft) as usize);
         file_parsing::parse_annotations(&dwarf_data, &mut g_builder)?;
-        dbg!(&g_builder.graph_nodes);
+        dbg!(&g_builder.nodes);
         dbg!(&g_builder.modules);
         g_builder.prepare(&mut bin_interface);
 

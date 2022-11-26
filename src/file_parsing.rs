@@ -118,7 +118,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
     for mut node in &mut nodes.values_mut() {
         node.FQN = name_to_fqn(&node.FQN, &modules)?;
     }
-    graph_builder.graph_nodes = nodes;
+    graph_builder.nodes = nodes;
     graph_builder.modules = modules;
     Ok(())
 }

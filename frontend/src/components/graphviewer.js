@@ -31,7 +31,7 @@ const interactive = () => {
     let nodes = d3.selectAll('.node,.edge');
     nodes
         .on("click", function () { 
-          //console.log(this.__data__.key);
+          console.log(this);
           let key = parseInt(this.__data__.key.substring(1));
           console.log(key);
           console.log("clicked");

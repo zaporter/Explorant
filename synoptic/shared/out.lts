@@ -1,0 +1,18 @@
+Synoptic = S0,
+
+S0 = (::Start the program -> S1),
+
+S1 = (::Get the current time -> S2),
+
+S2 = (::Is the current time is divisible by 2? -> S3),
+
+S3 = (::divisible::enter -> S4),
+
+S4 = (::divisible::loop and print -> S5),
+
+S5 = (::divisible::loop and print -> S5
+		| ::Program finished -> S6),
+
+S6 = STOP.
+
+||MTS_Synoptic = (Synoptic).

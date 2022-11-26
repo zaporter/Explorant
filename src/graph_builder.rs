@@ -1,8 +1,13 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, VecDeque};
+use std::process::Command;
+use std::rc::Rc;
 use std::{collections::HashSet, io::BufWriter};
 use std::borrow::Cow;
 use std::io::Write;
 
+use dot_writer::{DotWriter, Attributes, Scope};
+use gml_parser::GMLObject;
 use librr_rs::BinaryInterface;
 use itertools::Itertools;
 use itertools::TupleWindows;
@@ -10,7 +15,7 @@ use std::ops::Range;
 use std::fs::File;
 
 use librr_rs::*;
-use crate::address_recorder::AddrIter;
+use crate::address_recorder::{AddrIter, self};
 use crate::shared_structs::GraphModule;
 use crate::{address_recorder::AddressRecorder, shared_structs::{GraphNode, TimeStamp}, query::node::TimeRange};
 
@@ -27,7 +32,8 @@ pub struct GraphBuilder {
     breakpoints : HashSet<usize>,
     is_prepared: bool,
     pub modules : HashMap<String,GraphModule>,
-    pub graph_nodes : HashMap<usize,GraphNode>,
+    pub synoptic_nodes : HashMap<usize,GraphNode>,
+    pub nodes : HashMap<usize,GraphNode>,
 }
 
 // Stablize negative f------ trait impls
@@ -38,7 +44,8 @@ impl GraphBuilder {
     pub fn new(max_ft : usize) -> Self {
         Self {
             address_recorder: AddressRecorder::new(max_ft),
-            graph_nodes: HashMap::new(),
+            nodes: HashMap::new(),
+            synoptic_nodes: HashMap::new(),
             ranges: Vec::new(),
             breakpoints: HashSet::new(),
             is_prepared: false,
@@ -50,27 +57,32 @@ impl GraphBuilder {
         self.ranges.push(ts);
         self.is_prepared = false;
     }
-    pub fn insert_graph_node(&mut self, node: GraphNode) {
-        self.graph_nodes.insert(node.address,node);
+    pub fn insert_node(&mut self, node: GraphNode) {
+        self.nodes.insert(node.address,node);
         self.is_prepared = false;
     }
 
-    pub fn get_graph_as_dot(&self) -> Option<String> {
+    pub fn get_graph_as_dot(&self) -> anyhow::Result<Option<String>> {
         if !self.is_prepared {
-            return None;
+            return Ok(None);
         }
-        let addresses = self.address_recorder.get_all_addresses().unwrap();
-        let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
-        let mut buf = BufWriter::new(Vec::new());
-        let mut f = File::create("test.dot").unwrap();
-        render_to(&mut buf, it.collect(), &self.graph_nodes);
-        let addresses = self.address_recorder.get_all_addresses().unwrap();
-        let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
-        render_to(&mut f, it.collect(), &self.graph_nodes);
+        let base = "/home/zack/Tools/MQP/code_slicer";
+        let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml",&base))?;
+        let root = GMLObject::from_str(&gml_data)?;
+        let graph = gml_parser::Graph::from_gml(root)?;
 
-        let bytes = buf.into_inner().unwrap();
-        let string = String::from_utf8(bytes).unwrap();
-        Some(string)
+
+        let data = self.gml_to_dot_str(graph)?;
+        // let mut buf = BufWriter::new(Vec::new());
+        // let mut f = File::create("test.dot").unwrap();
+        // render_to(&mut buf, it.collect(), &self.graph_nodes);
+        // let addresses = self.address_recorder.get_all_addresses().unwrap();
+        // let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
+        // render_to(&mut f, it.collect(), &self.graph_nodes);
+
+        // let bytes = buf.into_inner().unwrap();
+        // let string = String::from_utf8(bytes).unwrap();
+        Ok(Some(data))
     }
     //TODO: This code is heavily flawed and was written hastily in order to get something 
     //written 
@@ -88,10 +100,10 @@ impl GraphBuilder {
             signal_to_deliver:0,
         };
             
-        for node in self.graph_nodes.values() {
+        for node in self.nodes.values() {
             bin_interface.pin_mut().set_sw_breakpoint(node.address, 1);
         }
-        dbg!(self.graph_nodes.len());
+        dbg!(self.nodes.len());
 
         let mut opened_frame_time : i64 = bin_interface.current_frame_time();
         self.address_recorder.reset_ft_for_writing(opened_frame_time as usize);
@@ -107,7 +119,7 @@ impl GraphBuilder {
             }
             // serious problems about efficiently telling if this is an address of a node 
             // or of a timestamp
-            if self.graph_nodes.contains_key(&rip) {
+            if self.nodes.contains_key(&rip) {
                 self.address_recorder.insert_address(rip);
 
                 // meaning there is a breakpoint at rip
@@ -124,67 +136,118 @@ impl GraphBuilder {
             signal = bin_interface.pin_mut().continue_forward(cont).unwrap();
         }
         self.address_recorder.finished_writing_ft();
+
+
+        let addresses = self.address_recorder.get_all_addresses().unwrap();
+        //let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
+        let node_names = addresses.map(|addr| &self.nodes.get(&addr).unwrap().FQN);
+        let base = "/home/zack/Tools/MQP/code_slicer";
+        let mut output  = File::create(format!("{}/synoptic/shared/test.log", &base))?;
+        for name in node_names {
+            writeln!(output, "{}", name);
+        }
+        let out = Command::new(format!("{}/synoptic/run.sh",&base)).output()?;
+        dbg!(out);
+        let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml",&base))?;
+        let root = GMLObject::from_str(&gml_data)?;
+        let graph = gml_parser::Graph::from_gml(root)?;
+
+        self.build_synoptic_nodes(&graph);
+
+
         self.is_prepared = true;
         Ok(())
 
     }
-        
+    fn build_synoptic_nodes(&mut self, gml_graph : &gml_parser::Graph){
+        'outer: for gml_node in &gml_graph.nodes {
+            for (_,my_node) in &self.nodes {
+                if my_node.FQN == gml_node.label.clone().unwrap() {
+                    self.synoptic_nodes.insert(gml_node.id as usize, my_node.clone());
+                    continue 'outer;
 
-}
-type Nd = usize;
-type Ed = (usize,usize);
-struct Edges<'a>{
-    e_vec: Vec<Ed>,
-    nodes: &'a HashMap<usize, GraphNode>,
-}
 
-pub fn render_to<W: Write>(output: &mut W, mut e_vec: Vec<Ed>, nodes: &HashMap<usize,GraphNode>) {
-    e_vec.sort();
-    e_vec.dedup();
-    let edges = Edges {
-        e_vec,
-        nodes,
-    };
-    dot::render(&edges, output).unwrap()
-}
+                }
+            }
 
-impl<'a> dot::Labeller<'a, Nd, Ed> for Edges<'_> {
-    fn graph_id(&'a self) -> dot::Id<'a> { dot::Id::new("example1").unwrap() }
-
-    fn node_id(&'a self, n: &Nd) -> dot::Id<'a> {
-        dot::Id::new(format!("N{}", *n)).unwrap()
-    }
-    fn node_label(&'a self, n: &Nd) -> dot::LabelText<'a> {
-        let node = self.nodes.get(n);
-        let name = if let Some(node) = node {
-            &node.FQN
-        }else {
-            "Error!"
-        };
-        dot::LabelText::LabelStr(name.into())
-    }
-}
-
-impl<'a> dot::GraphWalk<'a, Nd, Ed> for Edges<'_> {
-    fn nodes(&self) -> dot::Nodes<'a,Nd> {
-        // (assumes that |N| \approxeq |E|)
-        let &Edges{ref e_vec,..}= self;
-        let mut nodes = Vec::with_capacity(e_vec.len());
-        for &(s,t) in e_vec {
-            nodes.push(s); nodes.push(t);
         }
-        nodes.sort();
-        nodes.dedup();
-        Cow::Owned(nodes)
     }
-
-    fn edges(&'a self) -> dot::Edges<'a,Ed> {
-        let &Edges{ref e_vec,..}= self;
-        Cow::Borrowed(&e_vec[..])
+    fn create_node_recursive(&self,parent_name:Option<&str>, parent_scope : &mut Scope, nodes: & Vec<gml_parser::Node>) {
+        if parent_name.is_some() {
+            parent_scope.set_label(parent_name.unwrap());
+                
+        }
+        for node in nodes {
+            let label = &node.label.clone().unwrap();
+            if label == "INITIAL" || label == "TERMINAL" {
+                continue;
+            }
+            let (p_name, s_name) = Self::get_direct_module_parent(&label); 
+            if p_name == parent_name {
+                parent_scope.node_named(format!("N{}",node.id))
+                    .set_label(&label);
+            }
+        }
+        for (mod_name, module) in &self.modules {
+            if module.parent.as_deref() == parent_name {
+                let mut child_scope = parent_scope.cluster();
+                self.create_node_recursive(Some(&mod_name), &mut child_scope, nodes);
+            }
+        }
     }
+    fn get_direct_module_parent(name: &str)->(Option<&str>, &str) {
+        let elems :Vec<&str>= name.split("::").collect();
+        let m_name = elems[elems.len()-2];
+        let self_name = elems[elems.len()-1];
+        if m_name.len() == 0 {
+            (None, self_name)
+        }else {
+            (Some(m_name), self_name)
+        }
+    }
+    
+    fn gml_to_dot_str(&self, gml_graph : gml_parser::Graph) -> anyhow::Result<String> {
+        let mut output_bytes = Vec::new();
+        {
+            let mut writer = DotWriter::from(&mut output_bytes);
+            writer.set_pretty_print(false);
+            let mut digraph = writer.digraph();
 
-    fn source(&self, e: &Ed) -> Nd { e.0 }
+            self.create_node_recursive(None, &mut digraph, &gml_graph.nodes);
+            // let mut cluster_map : HashMap<Option<String>, Rc<RefCell<Scope>>>  = HashMap::new();
+            // cluster_map.insert(None, Rc::new(RefCell::new(digraph)));
+            // let mut to_resolve = VecDeque::new();
+            // to_resolve.push_back(None);
+            // while let Some(resolving) = to_resolve.pop_front(){
+            //         let parent_scope = cluster_map.get(&resolving).unwrap();
+            //     for (key, module) in &self.modules {
+            //         if module.parent == resolving {
+            //             let to_insert = Some(key.clone());
+            //             to_resolve.push_back(to_insert.clone());
+                        
+            //             let inner_scope = parent_scope.borrow_mut().cluster();
+            //             cluster_map.insert(to_insert.clone(), Rc::new(RefCell::new(inner_scope)));
+            //         }
+                    
+            //     }
 
-    fn target(&self, e: &Ed) -> Nd { e.1 }
+            // }
+            // for node in gml_graph.nodes {
+            //     digraph.node_named(format!("N{}",node.id))
+            //         .set_label(&node.label.unwrap_or("[unnamed]".into()))
+            //         .set_color(dot_writer::Color::Red);
+            // }
+            for edge in gml_graph.edges {
+                digraph.edge(
+                        format!("N{}", edge.source),
+                        format!("N{}", edge.target)
+                    );
+            }
+        }
+        Ok(String::from_utf8(output_bytes)?)
+
+
+    }
 }
+
 

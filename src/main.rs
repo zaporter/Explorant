@@ -172,7 +172,7 @@ async fn get_current_graph(
     dbg!(&data.get_ref().traces.len());
     let response : CurrentGraphResponse = CurrentGraphResponse {
         version : 0,
-        dot: dot_data
+        dot: dot_data.unwrap()
     };
     HttpResponse::Ok().json(response)
 }
@@ -184,7 +184,7 @@ async fn get_node_data(
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let resp = NodeDataResponse{
         modules: graph_builder.modules.clone(),
-        nodes: graph_builder.graph_nodes.clone(),
+        nodes: graph_builder.synoptic_nodes.clone(),
     };
     HttpResponse::Ok().json(resp)
 }
