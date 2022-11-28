@@ -8,14 +8,14 @@ use crate::simulation::Simulation;
 use librr_rs::*;
 
 pub fn run(save_dir: &PathBuf) {
-    println!("Running MVP on {:?}", save_dir);
-    let mut simulation: Simulation = Simulation::new(save_dir.clone()).unwrap();
-    // let mut addresses = Vec::new();
-    let mut bin_interface = simulation.bin_interface.get_mut().unwrap();
-    let erebor = simulation.dwarf_data.lock().unwrap();
-    let g_builder = simulation.graph_builder.lock().unwrap();
-    let result = g_builder.get_graph_as_dot().unwrap();
-    dbg!(result);
+    // println!("Running MVP on {:?}", save_dir);
+    // let mut simulation: Simulation = Simulation::new(save_dir.clone()).unwrap();
+    // // let mut addresses = Vec::new();
+    // let mut bin_interface = simulation.bin_interface.get_mut().unwrap();
+    // let erebor = simulation.dwarf_data.lock().unwrap();
+    // let g_builder = simulation.graph_builder.lock().unwrap();
+    // let result = g_builder.get_graph_as_dot().unwrap();
+    // dbg!(result);
 
 }
 
