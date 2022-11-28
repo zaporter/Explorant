@@ -8,7 +8,7 @@ const SrcViewer = (props) => {
   const codeString = '(num) => num + 1';
   return (
   <div className="src-viewer">
-    <p>{"[source viewer]"}</p>
+    <h3>{"Source Viewer"}</h3>
     <p>{`Viewing ${currentFile}`}</p>
     {/* <p key={currentFile }>{data.data}</p> */}
     <div className="src-inner">

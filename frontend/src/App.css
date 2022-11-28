@@ -1,5 +1,12 @@
+
+
 .App {
   /* text-align: center; */
+  background-color: #2c3333;
+}
+body {
+  /* text-align: center; */
+  background-color: #2c3333;
 }
 
 .App-logo {
@@ -12,6 +19,16 @@
     animation: App-logo-spin infinite 20s linear;
   }
 }
+.title {
+  
+}
+h1 {
+  color: #f19a3e;
+  text-align: center;
+}
+h3 {
+  color: #7fb235;
+}
 
 .App-header {
   background-color: #282c34;
@@ -23,15 +40,36 @@
   font-size: calc(10px + 2vmin);
   color: white;
 }
+.node-editor {
+  background-color: #295b64;
+  margin: 5px;
+  padding: 5px;
+}
 .src-viewer{
   width:50%;
+  background-color: #295b64;
+  margin: 5px;
+  padding: 5px;
 }
 .src-inner{
-  height:440px;
+  height:100%;
   overflow-y:auto;
 }
 .graph-viewer {
+}
+.graph-outer {
+  background-color: #295b64;
+  margin: 5px;
+  padding: 5px;
   width:50%;
+}
+.lane-viewer {
+  background-color: #295b64;
+  margin: 5px;
+  padding: 5px;
+}
+.lane-viewer-timeline {
+  color:#FFFFFF;
 }
 
 .App-link {

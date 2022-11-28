@@ -2,6 +2,7 @@ import logo from './logo.svg';
 import './App.css';
 import React, {useEffect, useState} from 'react';
 import LaneViewer from './components/LaneViewer.js';
+import NodeEditor from './components/NodeEditor.js';
 import SrcViewer from './components/srcviewer.js';
 import GraphViewer from './components/graphviewer.js';
 import useRemoteResource from './util.js';
@@ -29,11 +30,13 @@ function App() {
   return (
     <div className="App">
 {/* <Graphviz dot={dot} /> */}
+      <h1 className='title'>Trace2State</h1>
 
-      <div style={{display:"flex", flexDirection:"row", width:"100%", flexBasis:"50%"}}>
-        {generalInfo && <SrcViewer currentFile={currentFile}/>}
-        {generalInfo && <GraphViewer setCurrentFile={setCurrentFile} />}
+        <div style={{display:"flex", flexDirection:"row", width:"100%", flexBasis:"50%"}}>
+          {generalInfo && <SrcViewer currentFile={currentFile}/>}
+          {generalInfo && <GraphViewer setCurrentFile={setCurrentFile} />}
         </div>
+          {generalInfo && <NodeEditor generalInfo={generalInfo}/>}
           {generalInfo && <LaneViewer generalInfo={generalInfo}/>}
         {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
         <p>{count.id}</p>

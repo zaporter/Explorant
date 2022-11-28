@@ -28,8 +28,9 @@ const LaneViewer = (props) => {
   const dateFormat = (ms) => ms && ms;
   
   return (
-    <div>
-      <Timeline width={600} height={300} events={events} lanes={lanes} dateFormat={dateFormat} />
+    <div className='lane-viewer'>
+      <h3>{"Traces"}</h3>
+      <Timeline className='lane-viewer-timeline' width={600} height={300} events={events} lanes={lanes} dateFormat={dateFormat} />
     </div>
   )
 }

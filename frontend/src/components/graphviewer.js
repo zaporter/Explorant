@@ -13,10 +13,10 @@ const GraphViewer = (props) => {
   const [dotSrc, setDotSrc] = useRemoteResource({version:0,dot:`digraph { graph [label="No Loaded Graph"] }`}, {}, 'current_graph');
   const [nodesData, setNodeData] = useRemoteResource({}, {}, 'node_data');
 const defaultOptions = {
-  fit: true,
-  height: 500,
-  width: 500,
-  zoom: false,
+  fit: false,
+  height: 700,
+  width: 700,
+  zoom: true,
 };
 ;
   //const [dotSrc, setDotSrc] = React.useState(dotSrcEx);
@@ -64,7 +64,11 @@ const interactive = () => {
 
   }, [dotSrc]);
 
-  return <div className="graph-viewer" id={id} />;
+return (<div className='graph-outer'>
+  <h3>{"GraphViz Viewer"}</h3>
+  <div className="graph-viewer" id={id} />
+  </div>
+);
 }
 
 export default GraphViewer;

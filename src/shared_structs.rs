@@ -170,6 +170,12 @@ pub_struct!(Function{
 });
 
 
+pub_struct!(SelectNodeRequest{
+    synoptic_id: usize,
+});
+pub_struct!(SelectNodeResponse{
+    
+});
 pub_struct!(FunctionExecutionHeatMapRequest{
     range:TimeRange,
     function_address: usize,
