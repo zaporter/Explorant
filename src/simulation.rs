@@ -109,7 +109,7 @@ impl Simulation {
         file_parsing::parse_annotations(&dwarf_data, &mut g_builder)?;
         dbg!(&g_builder.nodes);
         dbg!(&g_builder.modules);
-        g_builder.prepare(&mut bin_interface);
+        g_builder.prepare(&mut bin_interface)?;
 
 
         Ok(Self{

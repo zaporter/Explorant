@@ -66,7 +66,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap()+0x555555554000);
+                                event_addr = Some(addrs.first().unwrap().clone()/*+0x555555554000*/);
                                 final_offset = offset;
                                 break 'addr_search;
                             }
@@ -93,7 +93,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         let addrs = file_info.lines.get(&((line_num+offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap()+0x555555554000);
+                                event_addr = Some(addrs.first().unwrap().clone()/*+0x555555554000*/);
                                 final_offset = offset;
                                 break 'addr_search;
                             }

@@ -37,21 +37,21 @@ use actix_web::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-mod block;
-mod graph_builder;
 mod address_recorder;
+mod block;
 mod file_parsing;
+mod graph_builder;
 // mod code_flow_graph;
 // mod graph_layout;
 // mod gui;
+mod erebor;
 mod lcs;
+mod mvp;
 mod query;
 mod recorder;
 mod shared_structs;
 mod simulation;
 mod trampoline;
-mod mvp;
-mod erebor;
 use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
@@ -81,15 +81,15 @@ enum Commands {
 }
 
 // ASSUMPTIONS
-// All code is run from the same binary 
+// All code is run from the same binary
 // with ASLR turned off.
-// Anything else is undefined behavior and 
-// will fail silenty. 
+// Anything else is undefined behavior and
+// will fail silenty.
 struct SimulationStorage {
     traces: Vec<Simulation>,
+    settings: Mutex<Settings>,
     //dwarf_data: Mutex<Erebor>,
     //graph_builder: Mutex<GraphBuilder>,
-
 }
 async fn ping(req: web::Json<PingRequest>) -> HttpResponse {
     let req = req.0;
@@ -126,9 +126,7 @@ async fn get_recorded_frames(
     };
     for frame_name in to_load {
         let dir = save_dir.join(frame_name.clone());
-        response
-            .frames
-            .insert(frame_name, Vec::new());
+        response.frames.insert(frame_name, Vec::new());
     }
     HttpResponse::Ok().json(response)
 }
@@ -136,9 +134,9 @@ async fn get_general_info(
     data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<EmptyRequest>,
 ) -> HttpResponse {
-    let mut traces : Vec<TraceGeneralInfo> = Vec::new();
-    let mut binary_name : Option<String> = None;
-    for (id,simulation) in data.as_ref().traces.iter().enumerate() {
+    let mut traces: Vec<TraceGeneralInfo> = Vec::new();
+    let mut binary_name: Option<String> = None;
+    for (id, simulation) in data.as_ref().traces.iter().enumerate() {
         let mut binary_interface = match simulation.bin_interface.lock() {
             Ok(k) => k,
             Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
@@ -150,17 +148,21 @@ async fn get_general_info(
             Ok(k) => k,
             Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
         };
-        traces.push(TraceGeneralInfo { id, frame_time_map: frame_time_map.clone(), proc_maps: binary_interface.get_proc_map().unwrap().to_vec() });
+        traces.push(TraceGeneralInfo {
+            id,
+            frame_time_map: frame_time_map.clone(),
+            proc_maps: binary_interface.get_proc_map().unwrap().to_vec(),
+        });
     }
     let data = GeneralInfoResponse {
-        binary_name : binary_name.unwrap(),
+        binary_name: binary_name.unwrap(),
         traces,
     };
     HttpResponse::Ok().json(data)
 }
 async fn get_current_graph(
     data: web::Data<Arc<SimulationStorage>>,
-    packet_version : web::Data<Arc<Mutex<usize>>>,
+    packet_version: web::Data<Arc<Mutex<usize>>>,
     _req: web::Json<CurrentGraphRequest>,
 ) -> HttpResponse {
     // let mut packet_version = packet_version.get_ref().lock().unwrap();
@@ -170,9 +172,9 @@ async fn get_current_graph(
     let dot_data = graph_builder.get_graph_as_dot().unwrap();
     dbg!(&dot_data);
     dbg!(&data.get_ref().traces.len());
-    let response : CurrentGraphResponse = CurrentGraphResponse {
-        version : 0,
-        dot: dot_data.unwrap()
+    let response: CurrentGraphResponse = CurrentGraphResponse {
+        version: 0,
+        dot: dot_data.unwrap(),
     };
     HttpResponse::Ok().json(response)
 }
@@ -180,26 +182,41 @@ async fn get_node_data(
     data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<NodeDataRequest>,
 ) -> HttpResponse {
-
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
-    let resp = NodeDataResponse{
+    let resp = NodeDataResponse {
         modules: graph_builder.modules.clone(),
         nodes: graph_builder.synoptic_nodes.clone(),
     };
     HttpResponse::Ok().json(resp)
+}
+async fn get_settings(
+    data: web::Data<Arc<SimulationStorage>>,
+    _req: web::Json<GetSettingsRequest>,
+) -> HttpResponse {
+    let settings: Settings = data.get_ref().settings.lock().unwrap().clone();
+    HttpResponse::Ok().json(settings)
+}
+async fn set_settings(
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<SetSettingsRequest>,
+) -> HttpResponse {
+    let req = req.0;
+    let settings: &mut Settings = &mut data.get_ref().settings.lock().unwrap();
+    *settings = req.settings;
+    settings.version += 1;
+    HttpResponse::Ok().json(settings.clone())
 }
 async fn get_source_file(
     data: web::Data<Arc<SimulationStorage>>,
     req: web::Json<SourceFileRequest>,
 ) -> HttpResponse {
     let req = req.0;
-    // TODO Checks here 
+    // TODO Checks here
     let contents = std::fs::read_to_string(req.file_name);
     let resp = SourceFileResponse {
-        data:contents.unwrap_or("[empty]".into()),
+        data: contents.unwrap_or("[empty]".into()),
     };
     HttpResponse::Ok().json(resp)
-
 }
 
 #[actix_web::main]
@@ -215,14 +232,14 @@ async fn main() -> std::io::Result<()> {
         Commands::Record { exe, save_dir } => {
             recorder::record(exe, save_dir, None);
             Ok(())
-        },
+        }
         Commands::Serve { traces } => {
             return run_server(traces.clone()).await;
-        },
-        Commands::Mvp {save_dir} => {
+        }
+        Commands::Mvp { save_dir } => {
             mvp::run(save_dir);
             Ok(())
-        },
+        }
     }
 }
 async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
@@ -231,9 +248,15 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
         // TODO: Anyhow this with proper msg
         return Ok(());
     }
-    let traces = traces.iter().map(|t| Simulation::new(t.clone()).unwrap()).collect();
-    let simulation: Arc<SimulationStorage> = Arc::new(SimulationStorage { traces });
-    let packet_version : Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+    let traces = traces
+        .iter()
+        .map(|t| Simulation::new(t.clone()).unwrap())
+        .collect();
+    let simulation: Arc<SimulationStorage> = Arc::new(SimulationStorage {
+        traces,
+        settings: Mutex::new(Settings::default()),
+    });
+    let packet_version: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
     let port = 8080;
     let ip = "127.0.0.1";
     log::info!("Starting HTTP server at {}:{}", &ip, port);
@@ -245,7 +268,7 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .app_data(web::Data::new(simulation.clone()))
             .app_data(web::Data::new(packet_version.clone()))
-            .app_data(web::JsonConfig::default().limit(40000096)) 
+            .app_data(web::JsonConfig::default().limit(40000096))
             .service(web::resource("/ping").route(web::post().to(ping)))
             .service(
                 web::resource("/instruction_pointer")
@@ -256,11 +279,9 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/current_graph").route(web::post().to(get_current_graph)))
             .service(web::resource("/node_data").route(web::post().to(get_node_data)))
             .service(web::resource("/source_file").route(web::post().to(get_source_file)))
+            .service(web::resource("/set_settings").route(web::post().to(set_settings)))
+            .service(web::resource("/get_settings").route(web::post().to(get_settings)))
 
-        // .service(web::resource("/createsheet").route(web::post().to(create_sheet)))
-        // .service(web::resource("/getsheet").route(web::post().to(get_sheet)))
-        // .service(web::resource("/updatesheet").route(web::post().to(update_sheet)))
-        // .service(web::resource("/forksheet").route(web::post().to(fork_sheet)))
     })
     .bind((ip, port))?
     .run()

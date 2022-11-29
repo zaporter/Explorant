@@ -1,7 +1,10 @@
-use std::{collections::{HashMap, BTreeMap}, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 use procmaps::Map;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 // from https://stackoverflow.com/questions/53866508/how-to-make-a-public-struct-where-all-fields-are-public-without-repeating-pub
 //
 // It really would be great if rust added a way to indicate that all elements of a struct are
@@ -16,28 +19,37 @@ macro_rules! pub_struct {
     }
 }
 pub type TraceID = usize;
-pub_struct!(PingRequest {
-    id:usize
+pub_struct!(PingRequest { id: usize });
+pub_struct!(PingResponse { id: usize });
+
+pub_struct!(Settings {
+    version: usize,
+    use_synoptic: bool,
+    selected_node_id: Option<usize>,
 });
-pub_struct!(PingResponse {
-    id:usize 
-});
-pub_struct!(EmptyRequest{});
-pub_struct!(InstructionPointerRequest{
-    trace_id : TraceID,
-});
-pub_struct!(InstructionPointerResponse{
-    instruction_pointer:usize,
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            version: 0,
+            use_synoptic: true,
+            selected_node_id: None,
+        }
+    }
+}
+pub_struct!(GetSettingsRequest {});
+pub_struct!(SetSettingsRequest { settings: Settings });
+pub_struct!(EmptyRequest {});
+pub_struct!(InstructionPointerRequest { trace_id: TraceID });
+pub_struct!(InstructionPointerResponse {
+    instruction_pointer: usize,
 });
 
-pub_struct!(RecordedFramesRequest {
-    trace_id : TraceID,
-});
+pub_struct!(RecordedFramesRequest { trace_id: TraceID });
 pub_struct!(RecordedFramesResponse{
     frames: HashMap<String, Vec<u8>>,
 });
 
-pub_struct!(GeneralInfoRequest{});
+pub_struct!(GeneralInfoRequest {});
 pub_struct!(GeneralInfoResponse {
     binary_name: String,
     traces: Vec<TraceGeneralInfo>,
@@ -65,9 +77,7 @@ pub_struct!(LabeledTransition {
     dest_FQN: String,
     label: String,
 });
-pub_struct!(NodeDataRequest{
-    
-});
+pub_struct!(NodeDataRequest {});
 pub_struct!(NodeDataResponse{
     modules : HashMap<String,GraphModule>,
     nodes : HashMap<usize,GraphNode>,
@@ -75,16 +85,14 @@ pub_struct!(NodeDataResponse{
 
 pub_struct!(CurrentGraphRequest {});
 pub_struct!(CurrentGraphResponse {
-    version : usize,
+    version: usize,
     dot: String,
 });
 
-pub_struct!(ScreenshotCaptures {
-    
-});
+pub_struct!(ScreenshotCaptures {});
 pub_struct!(TimeRange {
-    start:TimeStamp,
-    end:TimeStamp,
+    start: TimeStamp,
+    end: TimeStamp,
 });
 
 pub_struct!(TimeStamp{
@@ -93,45 +101,35 @@ pub_struct!(TimeStamp{
     instance_of_addr:Option<usize>,
 });
 impl TimeStamp {
-    pub fn new_at_ft(frame_time: usize) -> Self{
+    pub fn new_at_ft(frame_time: usize) -> Self {
         Self {
             frame_time,
-            addr:None,
-            instance_of_addr:None,
+            addr: None,
+            instance_of_addr: None,
         }
     }
 }
 
-pub_struct!(SourceFileRequest{
-    file_name:String,
-});
+pub_struct!(SourceFileRequest { file_name: String });
 
-pub_struct!(SourceFileResponse{
-    data:String,
-});
+pub_struct!(SourceFileResponse { data: String });
 
-pub_struct!(GetFunctionData{
-    
-});
-pub_struct!(FunctionTimeRangeRequest{
-    range:TimeRange,
-});
+pub_struct!(GetFunctionData {});
+pub_struct!(FunctionTimeRangeRequest { range: TimeRange });
 pub_struct!(FunctionTimeRangeResponse{
     addr_of_called_functions:Vec<usize>,
 });
 
-pub_struct!(FunctionInfoRequest{
+pub_struct!(FunctionInfoRequest {
     addr_of_function: usize,
 });
-pub_struct!(FunctionInfoResponse{
-    function:Function,
-});
+pub_struct!(FunctionInfoResponse { function: Function });
 
-#[derive(Debug,Clone,Serialize,Deserialize,PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum LineItem {
     RawString(String),
-    FunctionReference{address: usize},
-    TypeReference{address:usize},
+    FunctionReference { address: usize },
+    TypeReference { address: usize },
 }
 pub_struct!(Line{
     address: usize,
@@ -141,10 +139,10 @@ pub_struct!(Type {
     demangled_name: String,
 });
 
-pub_struct!(LineLocation{
+pub_struct!(LineLocation {
     file: PathBuf,
-    line_num:u32,
-    column_num:u32,
+    line_num: u32,
+    column_num: u32,
 });
 pub_struct!(FileInfo {
     functions: Vec<Function>,
@@ -153,35 +151,28 @@ pub_struct!(FileInfo {
 });
 impl Default for FileInfo {
     fn default() -> Self {
-        Self{
+        Self {
             functions: Vec::new(),
             lines: BTreeMap::new(),
         }
     }
 }
 
-pub_struct!(Function{
+pub_struct!(Function {
     source_file: PathBuf,
     demangled_name: String,
     address: usize,
     size: usize,
-    start_line: u32, 
+    start_line: u32,
     end_line: u32,
 });
 
-
-pub_struct!(SelectNodeRequest{
-    synoptic_id: usize,
-});
-pub_struct!(SelectNodeResponse{
-    
-});
-pub_struct!(FunctionExecutionHeatMapRequest{
-    range:TimeRange,
+pub_struct!(FunctionExecutionHeatMapRequest {
+    range: TimeRange,
     function_address: usize,
 });
-pub_struct!(FrameExecutionHeatMapResponse{
-    map:FunctionExecutionHeatMap,
+pub_struct!(FrameExecutionHeatMapResponse {
+    map: FunctionExecutionHeatMap,
 });
 
 pub_struct!(FunctionExecutionHeatMap{
@@ -193,6 +184,4 @@ pub_struct!( FrameTimeMap {
     times: HashMap<i64, u128>,
 });
 
-pub_struct!(ExecutionInfo{
-    
-});
+pub_struct!(ExecutionInfo {});

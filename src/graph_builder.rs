@@ -69,7 +69,7 @@ impl GraphBuilder {
             return Ok(None);
         }
         let base = "/home/zack/Tools/MQP/code_slicer";
-        let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base))?;
+        let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
         let root = GMLObject::from_str(&gml_data)?;
         let graph = gml_parser::Graph::from_gml(root)?;
 
@@ -104,6 +104,7 @@ impl GraphBuilder {
         };
 
         for node in self.nodes.values() {
+            dbg!(&node);
             bin_interface.pin_mut().set_sw_breakpoint(node.address, 1);
         }
         dbg!(self.nodes.len());
@@ -114,9 +115,11 @@ impl GraphBuilder {
 
         let mut signal = 5;
         while signal == 5 {
+
             let rip = bin_interface
                 .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
                 .to_usize();
+            dbg!(&rip);
             let current_ft = bin_interface.current_frame_time();
             if current_ft != opened_frame_time {
                 self.address_recorder.finished_writing_ft();
@@ -148,18 +151,22 @@ impl GraphBuilder {
         {
             let base = "/home/zack/Tools/MQP/code_slicer";
             // make sure to delete the out.gml file so we don't use stale data
-            std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base))?;
+            // intentionally dont fail if the file doesn't exist
+            std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base));
 
+            let addresses_2 : Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
+            dbg!(addresses_2);
             let addresses = self.address_recorder.get_all_addresses().unwrap();
             //let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
             let node_names = addresses.map(|addr| &self.nodes.get(&addr).unwrap().FQN);
             let mut output = File::create(format!("{}/synoptic/shared/test.log", &base))?;
             for name in node_names {
+                dbg!(&name);
                 writeln!(output, "{}", name)?;
             }
             let out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
             dbg!(out);
-            let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base))?;
+            let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
             let root = GMLObject::from_str(&gml_data)?;
             let graph = gml_parser::Graph::from_gml(root)?;
 
