@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { useEffect, useMemo } from 'react';
 import {  graphviz} from 'd3-graphviz';
-import useRemoteResource from '../util.js';
+import {useRemoteResource} from '../util.js';
+import {callRemote} from '../util.js';
 import * as d3 from "d3";
 
 let counter = 0;
@@ -26,6 +27,14 @@ const defaultOptions = {
   //     // ...options,
   //   }).renderDot(dotSrc);
   // }, []);
+const update_settings_and_redraw = (new_settings) => {
+    callRemote({"settings":new_settings}, "set_settings")
+    .then(
+      callRemote({}, "current_graph")
+        .then(response=>response.json())
+        .then(data=>setDotSrc(data))
+    );
+}
 const interactive = () => {
     console.log("interactive");
     let nodes = d3.selectAll('.node,.edge');
@@ -37,7 +46,14 @@ const interactive = () => {
           console.log("clicked");
           let respective = nodesData.nodes[key];
           console.log(respective.location);
+          callRemote({}, "get_settings")
+            .then(response=>response.json())
+            .then(old_settings=>{old_settings.selected_node_id=key; return old_settings})
+            .then(new_settings => update_settings_and_redraw(new_settings));
           setCurrentFile(respective.location.file);
+          // callRemote({}, "get_settings")
+          //   .then(response=>response.json())
+          //   .then(old_settings=>console.log(old_settings))
           // setDotSrc({version:1,dot:`
 // digraph {
     // node [style="filled"]

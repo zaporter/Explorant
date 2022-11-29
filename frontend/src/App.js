@@ -5,7 +5,7 @@ import LaneViewer from './components/LaneViewer.js';
 import NodeEditor from './components/NodeEditor.js';
 import SrcViewer from './components/srcviewer.js';
 import GraphViewer from './components/graphviewer.js';
-import useRemoteResource from './util.js';
+import {useRemoteResource} from './util.js';
 // import { Graphviz } from 'graphviz-react';
 // const useRemoteResource = (defaultVal, requestBody, endpoint) => {
 //   const [count, setCount] = useState(defaultVal);

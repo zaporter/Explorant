@@ -15,7 +15,7 @@ use std::fs::{self, File, OpenOptions};
 use std::ops::Range;
 
 use crate::address_recorder::{self, AddrIter};
-use crate::shared_structs::GraphModule;
+use crate::shared_structs::{GraphModule, Settings};
 use crate::{
     address_recorder::AddressRecorder,
     query::node::TimeRange,
@@ -64,7 +64,7 @@ impl GraphBuilder {
         self.is_prepared = false;
     }
 
-    pub fn get_graph_as_dot(&mut self) -> anyhow::Result<Option<String>> {
+    pub fn get_graph_as_dot(&mut self, settings: &Settings) -> anyhow::Result<Option<String>> {
         if !self.is_prepared {
             return Ok(None);
         }
@@ -73,7 +73,7 @@ impl GraphBuilder {
         let root = GMLObject::from_str(&gml_data)?;
         let graph = gml_parser::Graph::from_gml(root)?;
 
-        let data = self.gml_to_dot_str(graph)?;
+        let data = self.gml_to_dot_str(graph, settings)?;
         let addresses2: Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
         dbg!(addresses2);
         // let mut buf = BufWriter::new(Vec::new());
@@ -192,6 +192,7 @@ impl GraphBuilder {
         parent_name: Option<&str>,
         parent_scope: &mut Scope,
         nodes: &Vec<gml_parser::Node>,
+        settings: &Settings,
     ) {
         if parent_name.is_some() {
             parent_scope.set_label(parent_name.unwrap());
@@ -203,15 +204,18 @@ impl GraphBuilder {
             }
             let (p_name, s_name) = Self::get_direct_module_parent(&label);
             if p_name == parent_name {
+                let is_selected = Some(node.id as usize) == settings.selected_node_id;
+                let color : dot_writer::Color = if is_selected {dot_writer::Color::Red} else {dot_writer::Color::Black};
                 parent_scope
                     .node_named(format!("N{}", node.id))
+                    .set_color(color)
                     .set_label(&label);
             }
         }
         for (mod_name, module) in &self.modules {
             if module.parent.as_deref() == parent_name {
                 let mut child_scope = parent_scope.cluster();
-                self.create_node_recursive(Some(&mod_name), &mut child_scope, nodes);
+                self.create_node_recursive(Some(&mod_name), &mut child_scope, nodes, settings);
             }
         }
     }
@@ -226,14 +230,14 @@ impl GraphBuilder {
         }
     }
 
-    fn gml_to_dot_str(&self, gml_graph: gml_parser::Graph) -> anyhow::Result<String> {
+    fn gml_to_dot_str(&self, gml_graph: gml_parser::Graph, settings: &Settings) -> anyhow::Result<String> {
         let mut output_bytes = Vec::new();
         {
             let mut writer = DotWriter::from(&mut output_bytes);
             writer.set_pretty_print(false);
             let mut digraph = writer.digraph();
 
-            self.create_node_recursive(None, &mut digraph, &gml_graph.nodes);
+            self.create_node_recursive(None, &mut digraph, &gml_graph.nodes, settings);
             // let mut cluster_map : HashMap<Option<String>, Rc<RefCell<Scope>>>  = HashMap::new();
             // cluster_map.insert(None, Rc::new(RefCell::new(digraph)));
             // let mut to_resolve = VecDeque::new();

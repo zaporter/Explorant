@@ -169,7 +169,8 @@ async fn get_current_graph(
     // *packet_version+=1;
 
     let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
-    let dot_data = graph_builder.get_graph_as_dot().unwrap();
+    let settings = data.get_ref().settings.lock().unwrap();
+    let dot_data = graph_builder.get_graph_as_dot(&settings).unwrap();
     dbg!(&dot_data);
     dbg!(&data.get_ref().traces.len());
     let response: CurrentGraphResponse = CurrentGraphResponse {
@@ -281,7 +282,6 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/source_file").route(web::post().to(get_source_file)))
             .service(web::resource("/set_settings").route(web::post().to(set_settings)))
             .service(web::resource("/get_settings").route(web::post().to(get_settings)))
-
     })
     .bind((ip, port))?
     .run()

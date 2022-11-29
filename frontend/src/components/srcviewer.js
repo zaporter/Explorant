@@ -1,5 +1,5 @@
 import { Timeline } from 'react-svg-timeline'
-import useRemoteResource from '../util.js';
+import {useRemoteResource} from '../util.js';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 const SrcViewer = (props) => {
