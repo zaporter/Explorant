@@ -6,24 +6,27 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     erebor::Erebor,
-    shared_structs::{GraphModule, GraphNode, LineLocation}, graph_builder::GraphBuilder,
+    graph_builder::GraphBuilder,
+    shared_structs::{GraphModule, GraphNode, LineLocation},
 };
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
-
-pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> anyhow::Result<()> {
+pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> anyhow::Result<()> {
     let mut modules: HashMap<String, GraphModule> = HashMap::new();
-    let mut nodes: HashMap<usize,GraphNode> = HashMap::new();
+    let mut nodes: HashMap<usize, GraphNode> = HashMap::new();
     // we are not guaranteed to read the files
     // in any particular order so the FQNs of the nodes
     // will actually be their module::name and the
     // FQN will be resolved later.
-    modules.insert("".into(),GraphModule {
-        name: "".into(),
-        parent:None, 
-        module_attributes: HashMap::new(),
-    });
+    modules.insert(
+        "".into(),
+        GraphModule {
+            name: "".into(),
+            parent: None,
+            module_attributes: HashMap::new(),
+        },
+    );
     for (file_name, file_info) in &erebor.files {
         log::info!("reading file {} ", file_name.to_string_lossy());
         let file = File::open(file_name);
@@ -63,10 +66,11 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                     let mut event_addr = None;
                     let mut final_offset = 0;
                     'addr_search: for offset in 1..1000 {
-                        let addrs = file_info.lines.get(&((line_num+offset) as u32));
+                        let addrs = file_info.lines.get(&((line_num + offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap().clone()/*+0x555555554000*/);
+                                event_addr =
+                                    Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
                                 final_offset = offset;
                                 break 'addr_search;
                             }
@@ -76,24 +80,31 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
-                    nodes.insert(event_addr,GraphNode {
-                        FQN: name,
-                        address: event_addr,
-                        node_type: "event".into(),
-                        location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
-                        labeled_transisitons: Vec::new(),
-                        node_attributes: HashMap::new(),
-                    });
+                    nodes.insert(
+                        event_addr,
+                        GraphNode {
+                            FQN: name,
+                            address: event_addr,
+                            node_type: "event".into(),
+                            location: LineLocation {
+                                file: file_name.clone(),
+                                line_num: (final_offset + line_num) as u32,
+                                column_num: 0,
+                            },
+                            labeled_transisitons: Vec::new(),
+                            node_attributes: HashMap::new(),
+                        },
+                    );
                 }
                 Annotation::Flow { name } => {
-
                     let mut event_addr = None;
                     let mut final_offset = 0;
                     'addr_search: for offset in 1..1000 {
-                        let addrs = file_info.lines.get(&((line_num+offset) as u32));
+                        let addrs = file_info.lines.get(&((line_num + offset) as u32));
                         if let Some(addrs) = addrs {
                             if addrs.len() > 0 {
-                                event_addr = Some(addrs.first().unwrap().clone()/*+0x555555554000*/);
+                                event_addr =
+                                    Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
                                 final_offset = offset;
                                 break 'addr_search;
                             }
@@ -103,14 +114,21 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
-                    nodes.insert(event_addr,GraphNode {
-                        FQN: name,
-                        address: event_addr,
-                        node_type: "event".into(),
-                        location: LineLocation { file: file_name.clone(), line_num: (final_offset+line_num) as u32, column_num: 0 },
-                        labeled_transisitons: Vec::new(),
-                        node_attributes: HashMap::new(),
-                    });
+                    nodes.insert(
+                        event_addr,
+                        GraphNode {
+                            FQN: name,
+                            address: event_addr,
+                            node_type: "event".into(),
+                            location: LineLocation {
+                                file: file_name.clone(),
+                                line_num: (final_offset + line_num) as u32,
+                                column_num: 0,
+                            },
+                            labeled_transisitons: Vec::new(),
+                            node_attributes: HashMap::new(),
+                        },
+                    );
                 }
             }
         }
@@ -122,10 +140,10 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder ) -> 
     graph_builder.modules = modules;
     Ok(())
 }
-// TODO: prevent infinite recursion with a module having itself 
+// TODO: prevent infinite recursion with a module having itself
 // as its parent
-fn name_to_fqn(name : &str, modules: &HashMap<String,GraphModule>)->anyhow::Result<String>{
-    let mut ret : String = name.to_string();
+fn name_to_fqn(name: &str, modules: &HashMap<String, GraphModule>) -> anyhow::Result<String> {
+    let mut ret: String = name.to_string();
     loop {
         let curr_module_str = ret.split("::").next().ok_or(anyhow::anyhow!("{} is an invalid event name. Ensure that it has a module specifier with module::event_name (module can be empty (::event))",name))?;
         let curr_module = modules.get(curr_module_str);
@@ -135,7 +153,7 @@ fn name_to_fqn(name : &str, modules: &HashMap<String,GraphModule>)->anyhow::Resu
         if curr_module.parent.is_some() {
             ret.insert_str(0, "::");
             ret.insert_str(0, &curr_module.parent.as_ref().unwrap());
-        }else {
+        } else {
             break;
         }
     }
@@ -216,27 +234,41 @@ mod tests {
         assert_eq!(parse_line(line).unwrap(), Some(eq));
     }
     #[test]
-    fn fqn_discovery(){
-        
+    fn fqn_discovery() {
         let mut modules: HashMap<String, GraphModule> = HashMap::new();
-        modules.insert("".into(),GraphModule {
-            name: "".into(),
-            parent:None, 
-            module_attributes: HashMap::new(),
-        });
-        modules.insert("animal".into(),GraphModule {
-            name: "animal".into(),
-            parent:Some("".into()), 
-            module_attributes: HashMap::new(),
-        });
-        modules.insert("dog".into(),GraphModule {
-            name: "dog".into(),
-            parent:Some("animal".into()), 
-            module_attributes: HashMap::new(),
-        });
+        modules.insert(
+            "".into(),
+            GraphModule {
+                name: "".into(),
+                parent: None,
+                module_attributes: HashMap::new(),
+            },
+        );
+        modules.insert(
+            "animal".into(),
+            GraphModule {
+                name: "animal".into(),
+                parent: Some("".into()),
+                module_attributes: HashMap::new(),
+            },
+        );
+        modules.insert(
+            "dog".into(),
+            GraphModule {
+                name: "dog".into(),
+                parent: Some("animal".into()),
+                module_attributes: HashMap::new(),
+            },
+        );
         assert!(name_to_fqn("error", &modules).is_err());
         assert_eq!(name_to_fqn("::error", &modules).unwrap(), "::error");
-        assert_eq!(name_to_fqn("animal::error", &modules).unwrap(), "::animal::error");
-        assert_eq!(name_to_fqn("dog::error", &modules).unwrap(), "::animal::dog::error");
+        assert_eq!(
+            name_to_fqn("animal::error", &modules).unwrap(),
+            "::animal::error"
+        );
+        assert_eq!(
+            name_to_fqn("dog::error", &modules).unwrap(),
+            "::animal::dog::error"
+        );
     }
 }

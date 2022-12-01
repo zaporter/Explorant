@@ -74,8 +74,8 @@ impl GraphBuilder {
         let graph = gml_parser::Graph::from_gml(root)?;
 
         let data = self.gml_to_dot_str(graph, settings)?;
-        let addresses2: Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
-        dbg!(addresses2);
+        // let addresses2: Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
+        // dbg!(addresses2);
         // let mut buf = BufWriter::new(Vec::new());
         // let mut f = File::create("test.dot").unwrap();
         // render_to(&mut buf, it.collect(), &self.graph_nodes);
@@ -154,8 +154,8 @@ impl GraphBuilder {
             // intentionally dont fail if the file doesn't exist
             std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base));
 
-            let addresses_2 : Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
-            dbg!(addresses_2);
+            // let addresses_2 : Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
+            // dbg!(addresses_2);
             let addresses = self.address_recorder.get_all_addresses().unwrap();
             //let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
             let node_names = addresses.map(|addr| &self.nodes.get(&addr).unwrap().FQN);
@@ -209,6 +209,7 @@ impl GraphBuilder {
                 parent_scope
                     .node_named(format!("N{}", node.id))
                     .set_color(color)
+                    .set("root", "true", false)
                     .set_label(&label);
             }
         }

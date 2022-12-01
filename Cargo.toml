@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 # librr_rs = {git="https://github.com/zaporter/librr_rs"}
-
+rayon = "1.5"
 fallible-iterator = { version = "0.2.0"}
 actix-web = "4"
 regex = "1"

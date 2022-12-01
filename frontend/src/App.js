@@ -26,7 +26,7 @@ function App() {
   const [count,_setCount] = useRemoteResource(5,{id:21},'ping');
   const [ip,_setIp] = useRemoteResource(null,{trace_id:0},'instruction_pointer');
   const [generalInfo,_setGeneralInfo] = useRemoteResource(null,{},'general_info');
-  const [currentFile, setCurrentFile] = useState("");
+  const [currentFile, setCurrentFile] = useState({file:"",line:0});
   return (
     <div className="App">
 {/* <Graphviz dot={dot} /> */}

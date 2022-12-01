@@ -324,25 +324,25 @@ edge
 edge
 [
   source 3
-  target 12
-  label "P: 1.00"
-,]
-edge
-[
-  source 4
-  target 13
-  label "P: 1.00"
-,]
-edge
-[
-  source 5
   target 14
   label "P: 1.00"
 ,]
 edge
 [
-  source 6
+  source 4
+  target 12
+  label "P: 1.00"
+,]
+edge
+[
+  source 5
   target 10
+  label "P: 1.00"
+,]
+edge
+[
+  source 6
+  target 13
   label "P: 1.00"
 ,]
 edge
@@ -414,7 +414,7 @@ edge
 edge
 [
   source 17
-  target 3
+  target 4
   label "P: 1.00"
 ,]
 edge
@@ -450,19 +450,19 @@ edge
 edge
 [
   source 22
-  target 4
+  target 6
   label "P: 1.00"
 ,]
 edge
 [
   source 23
-  target 5
+  target 3
   label "P: 1.00"
 ,]
 edge
 [
   source 24
-  target 6
+  target 5
   label "P: 1.00"
 ,]
 edge
