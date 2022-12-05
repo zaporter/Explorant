@@ -263,7 +263,23 @@ impl GraphBuilder {
             //         .set_color(dot_writer::Color::Red);
             // }
             for edge in gml_graph.edges {
-                digraph.edge(format!("N{}", edge.source), format!("N{}", edge.target));
+                let mut attribs = digraph.edge(format!("N{}", edge.source), format!("N{}", edge.target)).attributes();
+                if let Some(label) = edge.label.clone() {
+                    let val = &label[3..];
+                    dbg!(&val);
+                    let val  = val.parse::<f32>(); 
+                    if let Ok(val) = val {
+                        attribs.set_pen_width(val*6.);
+                    }
+
+                }
+                if Some(edge.source as usize) == settings.selected_node_id {
+                    attribs.set_label(&edge.label.unwrap_or("".into()));
+                }
+                else if Some(edge.target as usize) == settings.selected_node_id {
+                    attribs.set_label(&edge.label.unwrap_or("".into()));
+                }
+
             }
         }
         Ok(String::from_utf8(output_bytes)?)

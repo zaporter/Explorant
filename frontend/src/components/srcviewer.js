@@ -1,6 +1,6 @@
 import { Timeline } from 'react-svg-timeline'
 import {useRemoteResource} from '../util.js';
-import SyntaxHighlighter from 'react-syntax-highlighter';
+import {Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 //import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 const SrcViewer = (props) => {
@@ -14,13 +14,14 @@ const SrcViewer = (props) => {
   
   let toDisplay = usedLines.join("\n");
   return (
+  <div className="box-wrapper">
   <div className="src-viewer">
     <h3>{"Source Viewer"}</h3>
     <p>{`Viewing ${currentFile.file}`}</p>
     {/* <p key={currentFile }>{data.data}</p> */}
     <div className="src-inner">
       <SyntaxHighlighter 
-        language="c-like" 
+        language="clike" 
         style={a11yDark} 
         startingLineNumber={minLine}
         showLineNumbers={true} 
@@ -37,6 +38,7 @@ const SrcViewer = (props) => {
       >
         {toDisplay}
       </SyntaxHighlighter>
+    </div>
     </div>
     </div>
   );

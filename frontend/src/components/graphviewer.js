@@ -11,6 +11,7 @@ const getId = () => `graphviz${counter++}`;
 const GraphViewer = (props) => {
   const [height, setHeight] = React.useState(10);
   const [width, setWidth] = React.useState(10);
+  var setNodeName = props.setNodeName;
 
   useEffect(() => {
         const resizeObserver = new ResizeObserver((event) => {
@@ -71,8 +72,9 @@ const GraphViewer = (props) => {
             callRemote({}, "get_settings")
               .then(response=>response.json())
               .then(old_settings=>{old_settings.selected_node_id=key; return old_settings})
-              .then(new_settings => update_settings_and_redraw(new_settings));
-            setCurrentFile({file:respective.location.file,line:respective.location.line_num});
+              .then(new_settings => update_settings_and_redraw(new_settings))
+              .then(_=>setNodeName(respective.FQN))
+              .then(_ => setCurrentFile({file:respective.location.file,line:respective.location.line_num}));
           // callRemote({}, "get_settings")
           //   .then(response=>response.json())
           //   .then(old_settings=>console.log(old_settings))
@@ -103,9 +105,12 @@ const GraphViewer = (props) => {
 
   }, [dotSrc]);
 
-return (<div className='graph-outer' id="sizeDiv">
+return (
+  <div className="box-wrapper">
+<div className='graph-outer' id="sizeDiv">
   <h3>{"GraphViz Viewer"}</h3>
     <div className="graph-viewer" id={id} />
+  </div>
   </div>
 );
 }

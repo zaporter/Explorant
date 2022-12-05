@@ -1,5 +1,4 @@
 
-
 .App {
   /* text-align: center; */
   background-color: #2c3333;
@@ -40,29 +39,43 @@ h3 {
   font-size: calc(10px + 2vmin);
   color: white;
 }
-.node-editor {
-  background-color: #295b64;
-  margin: 5px;
-  padding: 5px;
+.box-wrapper .node-editor {
 }
-.src-viewer{
-  width:50%;
-  background-color: #295b64;
-  margin: 5px;
-  padding: 5px;
+.box-wrapper .src-viewer{
+  /* width:50%; */
 }
-.src-inner{
-  height:100%;
+.box-wrapper .src-inner{
+  /* height:100%; */
   overflow-y:auto;
 }
 .graph-viewer {
   background-color: #fff;
 }
-.graph-outer {
+.box-wrapper .graph-outer {
+  /* width:50%; */
+}
+
+.split-layout {
+  width: 100%;
+  display: flex;
+}
+
+.split-layout-left,
+.split-layout-right {
+  overflow: hidden;
+}
+
+.split-layout-bar {
+  width: 20px;
+  margin-left: -1px;
+  cursor: col-resize;
+  background-color:red;
+
+}
+.box-wrapper {
   background-color: #295b64;
   margin: 5px;
   padding: 5px;
-  width:50%;
 }
 .lane-viewer {
   background-color: #295b64;
@@ -84,4 +97,39 @@ h3 {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Table styles */
+.execution-instance-list {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Header styles */
+.execution-instance-list__header {
+  font-weight: bold;
+  text-align: left;
+  padding: 8px;
+  border: 1px solid #ddd;
+}
+
+/* Row styles */
+.execution-instance-list__row {
+  border: 1px solid #ddd;
+}
+
+/* Cell styles */
+.execution-instance-list__cell {
+  padding: 8px;
+  text-align: left;
+}
+
+/* Hover styles */
+.execution-instance-list__row:hover {
+  background-color: #f5f5f5;
+}
+
+/* Click styles */
+.execution-instance-list__row:active {
+  background-color: #e2e2e2;
 }
