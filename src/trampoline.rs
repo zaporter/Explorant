@@ -337,25 +337,41 @@ impl TrampolineManager {
         }
         ca.add_instruction(replaced_instruction)?;
         let mut noop_to_replace = ca.create_label();
-        // SETUP
-        ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
-        ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
-        // RECORD DATA
-        ca.mov(code_asm::rax, replaced_instruction.ip())?;
-        ca.push(code_asm::rax)?;
-        // FLOW PROT
-        // ca.mov(code_asm::rax, 0xcccccccc_u64)?;
-        // ca.push(code_asm::rax)?;
-        // ca.pop(code_asm::rax)?;
+        let overflow_protection = false;
+        if !overflow_protection {
+            ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
+            ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
+            // RECORD DATA
+            ca.mov(code_asm::rax, replaced_instruction.ip())?;
+            ca.push(code_asm::rax)?;
+            // CLEANUP
+            ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
+            ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
+            ca.jmp(replaced_instruction.next_ip())?;
+        } else {
+            // SETUP
+            ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
+            ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
+            // RECORD DATA
+            ca.mov(code_asm::rax, replaced_instruction.ip())?;
+            ca.push(code_asm::rax)?;
+            // FLOW PROT
+            ca.mov(code_asm::rax, 0xcccccccc_u64)?;
+            ca.push(code_asm::rax)?;
+            ca.pop(code_asm::rax)?;
 
-        // ca.mov(code_asm::al, code_asm::byte_ptr(stack_info.base_addr+stack_info.reserved_space))?;
-        // ca.mov(code_asm::byte_ptr(noop_to_replace), code_asm::al)?;
-        // ca.set_label(&mut noop_to_replace)?;
-        // ca.nop()?;
-        // CLEANUP
-        ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
-        ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
-        ca.jmp(replaced_instruction.next_ip())?;
+            ca.mov(
+                code_asm::al,
+                code_asm::byte_ptr(stack_info.base_addr + stack_info.reserved_space),
+            )?;
+            ca.mov(code_asm::byte_ptr(noop_to_replace), code_asm::al)?;
+            ca.set_label(&mut noop_to_replace)?;
+            ca.nop()?;
+            // CLEANUP
+            ca.xchg(code_asm::ptr(stack_info.base_addr), code_asm::rsp)?;
+            ca.xchg(code_asm::ptr(stack_info.base_addr + 8), code_asm::rax)?;
+            ca.jmp(replaced_instruction.next_ip())?;
+        }
         // ca.jmp(flow_instruction.ip())?;
 
         let heap_trampoline_bytes = ca.assemble(heap_code_base_addr as u64)?;
