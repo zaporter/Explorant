@@ -1,13 +1,14 @@
 import logo from './logo.svg';
 import './App.css';
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import LaneViewer from './components/LaneViewer.js';
 import NodeEditor from './components/NodeEditor.js';
 import SrcViewer from './components/srcviewer.js';
 import SplitLayout from './components/SplitLayout.js';
+import LoadingModal from './components/LoadingModal.js';
 import ExecutionInstanceList from './components/ExecutionInstanceList.js';
 import GraphViewer from './components/graphviewer.js';
-import {useRemoteResource} from './util.js';
+import { useRemoteResource } from './util.js';
 // import { Graphviz } from 'graphviz-react';
 // const useRemoteResource = (defaultVal, requestBody, endpoint) => {
 //   const [count, setCount] = useState(defaultVal);
@@ -25,31 +26,65 @@ import {useRemoteResource} from './util.js';
 // };
 
 function App() {
-  const [count,_setCount] = useRemoteResource(5,{id:21},'ping');
-  const [ip,_setIp] = useRemoteResource(null,{trace_id:0},'instruction_pointer');
-  const [generalInfo,_setGeneralInfo] = useRemoteResource(null,{},'general_info');
-  const [node_name, setNodeName] = useState("[unselected]");
-  const [currentFile, setCurrentFile] = useState({file:"",line:0});
+  const [count, _setCount] = useRemoteResource(5, { id: 21 }, 'ping');
+  const [ip, _setIp] = useRemoteResource(null, { trace_id: 0 }, 'instruction_pointer');
+  const [generalInfo, _setGeneralInfo] = useRemoteResource(null, {}, 'general_info');
+  const [currentNodeId, setCurrentNodeId] = useState(null);
+  const [highlightedNodeIds, setHighlightedNodeIds] = useState([])
+  const updateCurrentNode = (newId) => {
+    setCurrentNodeId(newId);
+  }
+
+  const [nodesData, setNodeData] = useRemoteResource(null, {}, 'node_data');
+  const [currentFile, setCurrentFile] = useState({ file: "", line: 0 });
+  const [currentExecutionInstances, setCurrentExecutionInstances] = useState([{ frame_time: 0, addr: 0, instance_of_addr: 0 }])
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [currentFilePath, setCurrentFilePath] = useState(null);
+  const [currentFileLineNum, setCurrentFileLineNum] = useState(1);
+
   return (
     <div className="App">
-{/* <Graphviz dot={dot} /> */}
+      {isLoading && <LoadingModal />}
       <h1 className='title'>TraceTrail / Execumap</h1>
-       {generalInfo && (<SplitLayout>
-         <SrcViewer currentFile={currentFile}/>
-         {/* <p>{"hii"}</p> */}
-         {/* <p>{"hii"}</p> */}
-         <GraphViewer setCurrentFile={setCurrentFile} setNodeName={setNodeName}/>
+      {
+        (generalInfo && nodesData) ? (<SplitLayout>
+          <SrcViewer
+            nodesData={nodesData}
+            currentFilePath={currentFilePath}
+            setCurrentFilePath={setCurrentFilePath}
+            currentFileLineNum={currentFileLineNum}
+            setCurrentFileLineNum={setCurrentFileLineNum} />
+          <GraphViewer
+            nodesData={nodesData}
+            setCurrentFilePath={setCurrentFilePath}
+            setCurrentFileLineNum={setCurrentFileLineNum}
+            updateCurrentNode={updateCurrentNode} />
+        </SplitLayout>)
+          :
+          (<p>{"General and node data did not load. Did the backend crash?"}</p>)
+      }
+      {currentNodeId && nodesData && <div>
+        <NodeEditor
+          generalInfo={generalInfo}
+          nodesData={nodesData}
+          currentNodeId={currentNodeId} />
+         <ExecutionInstanceList 
+           nodesData={nodesData} 
+           currentNodeId={currentNodeId}
+           setHighlightedNodeIds={setHighlightedNodeIds}
+           executionInstances={currentExecutionInstances} 
+           setExecutionInstances={setCurrentExecutionInstances} />
+        {/* <LaneViewer 
+        {/*   generalInfo={generalInfo} */}
+        {/*   nodesData={nodesData} */}
+        {/*   executionInstances={currentExecutionInstances} /> */}
+      </div>}
 
-       </SplitLayout>)}
-
-          {generalInfo && <NodeEditor generalInfo={generalInfo} node_name={node_name}/>}
-          {generalInfo && <LaneViewer generalInfo={generalInfo}/>}
-          {generalInfo && <ExecutionInstanceList/>}
-          
-        {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
-        <p>{count.id}</p>
-        <p>{ip&&ip.instruction_pointer}</p>
-        {/* <p>{generalInfo && JSON.stringify(generalInfo)}</p> */}
+      {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
+      <p>{count.id}</p>
+      <p>{ip && ip.instruction_pointer}</p>
+      {/* <p>{generalInfo && JSON.stringify(generalInfo)}</p> */}
     </div>
   );
 }

@@ -52,6 +52,7 @@ mod recorder;
 mod shared_structs;
 mod simulation;
 mod trampoline;
+mod gdb_instance_manager;
 use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
@@ -171,11 +172,35 @@ async fn get_current_graph(
     let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let settings = data.get_ref().settings.lock().unwrap();
     let dot_data = graph_builder.get_graph_as_dot(&settings).unwrap();
-    dbg!(&dot_data);
-    dbg!(&data.get_ref().traces.len());
+    // dbg!(&dot_data);
+    // dbg!(&data.get_ref().traces.len());
     let response: CurrentGraphResponse = CurrentGraphResponse {
         version: 0,
         dot: dot_data.unwrap(),
+    };
+    HttpResponse::Ok().json(response)
+}
+async fn create_gdb_server(
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<CreateGdbServerRequest>,
+) -> HttpResponse {
+    let req = req.0;
+    // TODO
+    let response = CreateGdbServerResponse {
+        value: format!("rm -rf / {}", req.start_time.frame_time),
+    };
+    HttpResponse::Ok().json(response)
+}
+async fn get_addr_occurrences(
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<AddrOccurrencesRequest>,
+) -> HttpResponse {
+    let req = req.0;
+    let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    let occurs = graph_builder.get_addr_occurrences(req.synoptic_node_id);
+    //TODO
+    let response = AddrOccurrenceResponse {
+        val: occurs,
     };
     HttpResponse::Ok().json(response)
 }
@@ -282,7 +307,10 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/source_file").route(web::post().to(get_source_file)))
             .service(web::resource("/set_settings").route(web::post().to(set_settings)))
             .service(web::resource("/get_settings").route(web::post().to(get_settings)))
+            .service(web::resource("/create_gdb_server").route(web::post().to(create_gdb_server)))
+            .service(web::resource("/addr_occurrences").route(web::post().to(get_addr_occurrences)))
     })
+    .workers(1)
     .bind((ip, port))?
     .run()
     .await

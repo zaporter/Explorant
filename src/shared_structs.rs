@@ -43,6 +43,12 @@ pub_struct!(InstructionPointerRequest { trace_id: TraceID });
 pub_struct!(InstructionPointerResponse {
     instruction_pointer: usize,
 });
+pub_struct!(AddrOccurrencesRequest{
+    synoptic_node_id: usize,
+});
+pub_struct!(AddrOccurrenceResponse{
+    val: Vec<TimeStamp>,
+});
 
 pub_struct!(RecordedFramesRequest { trace_id: TraceID });
 pub_struct!(RecordedFramesResponse{
@@ -109,6 +115,13 @@ impl TimeStamp {
         }
     }
 }
+pub_struct!(CreateGdbServerRequest {
+    start_time : TimeStamp,
+});
+
+pub_struct!(CreateGdbServerResponse{
+    value: String, 
+});
 
 pub_struct!(SourceFileRequest { file_name: String });
 

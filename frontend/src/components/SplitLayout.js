@@ -28,7 +28,7 @@ const SplitLayout = ({ children }) => {
       </div>
       <div
         className="split-layout-bar"
-        style={{ width: `${1}px`, marginLeft: `${-1}px` }}
+        style={{ /*width: `${1}px`, */marginLeft: `${-1}px` }}
         onMouseDown={handleDragStart}
       >
         &nbsp;

@@ -3,6 +3,9 @@ use crate::shared_structs::*;
 // The first is a map of frametime -> FtBin
 //
 // The FtBin stores the addresses and then a map of TimeStamp->index
+//
+// The cool idea around this implementation is that it allows the user
+// to sparely record TimeStamps while densely recording addresses.
 pub struct AddressRecorder {
     records: Vec<FtBin>,
     write_head: usize,
@@ -61,13 +64,33 @@ impl AddressRecorder {
         // placeholder
     }
     //TODO test this function
-    pub fn get_all_addresses<'a>(&'a self)->anyhow::Result<AddrIter<'a>> {
+    pub fn get_all_addresses<'a>(&'a self) -> anyhow::Result<AddrIter<'a>> {
         let mut to_ret = AddrIter::new();
         for bin in &self.records {
             to_ret.chunks.push(&bin.addresses);
         }
         Ok(to_ret)
-
+    }
+    pub fn get_addr_occurrences(&self, target_addr: usize) -> Vec<TimeStamp> {
+        let mut ret = Vec::new();
+        for bin in &self.records {
+            if bin.indexes.len() == 0 {
+                continue;
+            }
+            let ft = &bin.indexes[0].0;
+            let mut count = 0;
+            for addr in &bin.addresses {
+                if *addr == target_addr {
+                    count += 1;
+                    ret.push(TimeStamp {
+                        frame_time: ft.frame_time,
+                        addr: Some(*addr),
+                        instance_of_addr: Some(count),
+                    });
+                }
+            }
+        }
+        ret
     }
     // return a vec of slices to
     // avoid copying large amounts of

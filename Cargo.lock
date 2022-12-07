@@ -847,6 +847,7 @@ dependencies = [
  "log",
  "nix",
  "object",
+ "port_scanner",
  "procmaps",
  "rand",
  "rayon",
@@ -2702,6 +2703,12 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
+name = "port_scanner"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "325a6d2ac5dee293c3b2612d4993b98aec1dff096b0a2dae70ed7d95784a05da"
 
 [[package]]
 name = "ppv-lite86"

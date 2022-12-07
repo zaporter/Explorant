@@ -35,6 +35,7 @@ pub struct GraphBuilder {
     ranges: Vec<TimeRange>,
     breakpoints: HashSet<usize>,
     is_prepared: bool,
+    gml_graph: Option<gml_parser::Graph>,
     pub modules: HashMap<String, GraphModule>,
     pub synoptic_nodes: HashMap<usize, GraphNode>,
     pub nodes: HashMap<usize, GraphNode>,
@@ -52,6 +53,7 @@ impl GraphBuilder {
             ranges: Vec::new(),
             breakpoints: HashSet::new(),
             is_prepared: false,
+            gml_graph: None,
             modules: HashMap::new(),
         }
     }
@@ -68,12 +70,17 @@ impl GraphBuilder {
         if !self.is_prepared {
             return Ok(None);
         }
-        let base = "/home/zack/Tools/MQP/code_slicer";
-        let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
-        let root = GMLObject::from_str(&gml_data)?;
-        let graph = gml_parser::Graph::from_gml(root)?;
+        // let base = "/home/zack/Tools/MQP/code_slicer";
+        // let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
+        // let root = GMLObject::from_str(&gml_data)?;
+        // let graph = gml_parser::Graph::from_gml(root)?;
 
-        let data = self.gml_to_dot_str(graph, settings)?;
+        let data = self.gml_to_dot_str(
+            self.gml_graph
+                .as_ref()
+                .expect("gml graph was None during get_graph_as_dot"),
+            settings,
+        )?;
         // let addresses2: Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
         // dbg!(addresses2);
         // let mut buf = BufWriter::new(Vec::new());
@@ -115,7 +122,6 @@ impl GraphBuilder {
 
         let mut signal = 5;
         while signal == 5 {
-
             let rip = bin_interface
                 .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
                 .to_usize();
@@ -166,15 +172,24 @@ impl GraphBuilder {
             }
             let out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
             dbg!(out);
-            let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
+            let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base))
+                .unwrap_or("graph [\n]".into());
             let root = GMLObject::from_str(&gml_data)?;
             let graph = gml_parser::Graph::from_gml(root)?;
 
             self.build_synoptic_nodes(&graph);
+            self.gml_graph = Some(graph);
         }
 
         self.is_prepared = true;
         Ok(())
+    }
+    // TODO ensure this fits into the graph rather than just grabbing the 
+    // address
+    pub fn get_addr_occurrences(&self, synoptic_id: usize) -> Vec<TimeStamp>{
+        let addr = &self.synoptic_nodes[&synoptic_id].address;
+        self.address_recorder.get_addr_occurrences(*addr)
+
     }
     fn build_synoptic_nodes(&mut self, gml_graph: &gml_parser::Graph) {
         'outer: for gml_node in &gml_graph.nodes {
@@ -205,7 +220,11 @@ impl GraphBuilder {
             let (p_name, s_name) = Self::get_direct_module_parent(&label);
             if p_name == parent_name {
                 let is_selected = Some(node.id as usize) == settings.selected_node_id;
-                let color : dot_writer::Color = if is_selected {dot_writer::Color::Red} else {dot_writer::Color::Black};
+                let color: dot_writer::Color = if is_selected {
+                    dot_writer::Color::Red
+                } else {
+                    dot_writer::Color::Black
+                };
                 parent_scope
                     .node_named(format!("N{}", node.id))
                     .set_color(color)
@@ -231,7 +250,11 @@ impl GraphBuilder {
         }
     }
 
-    fn gml_to_dot_str(&self, gml_graph: gml_parser::Graph, settings: &Settings) -> anyhow::Result<String> {
+    fn gml_to_dot_str(
+        &self,
+        gml_graph: &gml_parser::Graph,
+        settings: &Settings,
+    ) -> anyhow::Result<String> {
         let mut output_bytes = Vec::new();
         {
             let mut writer = DotWriter::from(&mut output_bytes);
@@ -262,24 +285,23 @@ impl GraphBuilder {
             //         .set_label(&node.label.unwrap_or("[unnamed]".into()))
             //         .set_color(dot_writer::Color::Red);
             // }
-            for edge in gml_graph.edges {
-                let mut attribs = digraph.edge(format!("N{}", edge.source), format!("N{}", edge.target)).attributes();
+            for edge in &gml_graph.edges {
+                let mut attribs = digraph
+                    .edge(format!("N{}", edge.source), format!("N{}", edge.target))
+                    .attributes();
                 if let Some(label) = edge.label.clone() {
                     let val = &label[3..];
-                    dbg!(&val);
-                    let val  = val.parse::<f32>(); 
+                    // dbg!(&val);
+                    let val = val.parse::<f32>();
                     if let Ok(val) = val {
-                        attribs.set_pen_width(val*6.);
+                        attribs.set_pen_width(val * 6.);
                     }
-
                 }
                 if Some(edge.source as usize) == settings.selected_node_id {
-                    attribs.set_label(&edge.label.unwrap_or("".into()));
+                    attribs.set_label(&edge.label.clone().unwrap_or("".into()));
+                } else if Some(edge.target as usize) == settings.selected_node_id {
+                    attribs.set_label(&edge.label.clone().unwrap_or("".into()));
                 }
-                else if Some(edge.target as usize) == settings.selected_node_id {
-                    attribs.set_label(&edge.label.unwrap_or("".into()));
-                }
-
             }
         }
         Ok(String::from_utf8(output_bytes)?)

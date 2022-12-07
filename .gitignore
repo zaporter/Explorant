@@ -1,3 +1,6 @@
 /target
 test-executables/*/target
 test-executables/build
+
+synoptic/shared/out.json
+synoptic/shared/out.gml
