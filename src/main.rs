@@ -211,10 +211,54 @@ async fn get_node_data(
     data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<NodeDataRequest>,
 ) -> HttpResponse {
+
+    log::error!("GET_S_n");
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let resp = NodeDataResponse {
         modules: graph_builder.modules.clone(),
         nodes: graph_builder.synoptic_nodes.clone(),
+    };
+    HttpResponse::Ok().json(resp)
+}
+async fn get_raw_nodes_and_modules(
+    data: web::Data<Arc<SimulationStorage>>,
+    _req: web::Json<GetRawNodesAndModulesRequest>,
+) -> HttpResponse {
+    log::error!("GET_RAW");
+    let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    let resp = GetRawNodesAndModulesResponse {
+        modules: graph_builder.modules.clone(),
+        nodes: graph_builder.nodes.clone(),
+    };
+    HttpResponse::Ok().json(resp)
+}
+async fn update_raw_nodes_and_modules(
+    data: web::Data<Arc<SimulationStorage>>,
+    req: web::Json<UpdateRawNodesAndModulesRequest>,
+) -> HttpResponse {
+    let req = req.0;
+    log::error!("UPDATE");
+    let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
+    log::error!("UPDATE_3");
+
+    *bin_interface = BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
+    let cthread = bin_interface.get_current_thread();
+    bin_interface.pin_mut().set_query_thread(cthread);
+    bin_interface.set_pass_signals(vec![
+        0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
+    ]);
+    log::error!("UPDATE_4");
+
+    log::error!("UPDATE2");
+    // let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
+    // let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    // log::error!("UPDATE_2");
+    // graph_builder.update_raw_modules(req.modules).unwrap();
+    // graph_builder.update_raw_nodes(req.nodes).unwrap();
+    // log::error!("UPDATE_3");
+    // graph_builder.prepare(&mut bin_interface);
+
+    let resp = UpdateRawNodesAndModulesResponse {
     };
     HttpResponse::Ok().json(resp)
 }
@@ -325,6 +369,8 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/create_gdb_server").route(web::post().to(create_gdb_server)))
             .service(web::resource("/addr_occurrences").route(web::post().to(get_addr_occurrences)))
             .service(web::resource("/source_files").route(web::post().to(get_all_source_files)))
+            .service(web::resource("/get_raw_nodes_and_modules").route(web::post().to(get_raw_nodes_and_modules)))
+            .service(web::resource("/update_raw_nodes_and_modules").route(web::post().to(update_raw_nodes_and_modules)))
     })
     .workers(1)
     .bind((ip, port))?

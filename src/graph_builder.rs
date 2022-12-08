@@ -57,6 +57,24 @@ impl GraphBuilder {
             modules: HashMap::new(),
         }
     }
+    // pub fn get_parent_tree_nodes_syn() -> Option<Vec<usize>>{
+
+    // }
+    pub fn update_raw_nodes(&mut self,mut nodes: HashMap<usize,GraphNode>) -> anyhow::Result<()>{
+        self.is_prepared = false;
+        for mut node in &mut nodes.values_mut() {
+            // Update for empty FQN and
+            // also update in case module changed. 
+            node.FQN = name_to_fqn(&format!("{}::{}", &node.module, &node.name), &self.modules)?;
+        }
+        self.nodes = nodes;
+        Ok(())
+    }
+    pub fn update_raw_modules(&mut self,modules: HashMap<String,GraphModule>)->anyhow::Result<()>{
+        self.is_prepared = false;
+        self.modules = modules;
+        Ok(())
+    }
     pub fn insert_time_range(&mut self, ts: TimeRange) {
         self.ranges.push(ts);
         self.is_prepared = false;
@@ -70,10 +88,6 @@ impl GraphBuilder {
         if !self.is_prepared {
             return Ok(None);
         }
-        // let base = "/home/zack/Tools/MQP/code_slicer";
-        // let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base)).unwrap_or("graph [\n]".into());
-        // let root = GMLObject::from_str(&gml_data)?;
-        // let graph = gml_parser::Graph::from_gml(root)?;
 
         let data = self.gml_to_dot_str(
             self.gml_graph
@@ -81,17 +95,6 @@ impl GraphBuilder {
                 .expect("gml graph was None during get_graph_as_dot"),
             settings,
         )?;
-        // let addresses2: Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
-        // dbg!(addresses2);
-        // let mut buf = BufWriter::new(Vec::new());
-        // let mut f = File::create("test.dot").unwrap();
-        // render_to(&mut buf, it.collect(), &self.graph_nodes);
-        // let addresses = self.address_recorder.get_all_addresses().unwrap();
-        // let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
-        // render_to(&mut f, it.collect(), &self.graph_nodes);
-
-        // let bytes = buf.into_inner().unwrap();
-        // let string = String::from_utf8(bytes).unwrap();
         Ok(Some(data))
     }
     //TODO: This code is heavily flawed and was written hastily in order to get something
@@ -99,6 +102,11 @@ impl GraphBuilder {
     // TODO : This code is also very fragile and /requires/ tests
     //
     pub fn prepare(&mut self, bin_interface: &mut BinaryInterface) -> anyhow::Result<()> {
+        log::warn!("a");
+
+        // bin_interface.pin_mut().restart_from_event(0);
+
+        log::warn!("a2");
         let cont = GdbContAction {
             type_: GdbActionType::ACTION_CONTINUE,
             target: bin_interface.get_current_thread(),
@@ -116,6 +124,7 @@ impl GraphBuilder {
         }
         dbg!(self.nodes.len());
 
+        log::warn!("a3");
         let mut opened_frame_time: i64 = bin_interface.current_frame_time();
         self.address_recorder
             .reset_ft_for_writing(opened_frame_time as usize);
@@ -151,6 +160,8 @@ impl GraphBuilder {
 
             signal = bin_interface.pin_mut().continue_forward(cont).unwrap();
         }
+
+        log::warn!("a4");
         self.address_recorder.finished_writing_ft();
 
         // Record locations in test.log, run synoptic, then read the output file
@@ -180,6 +191,13 @@ impl GraphBuilder {
             self.build_synoptic_nodes(&graph);
             self.gml_graph = Some(graph);
         }
+        log::warn!("a5");
+        // Remove all set swbreakpoints to not alter internal state of machine
+        for node in self.nodes.values() {
+            bin_interface.pin_mut().remove_sw_breakpoint(node.address, 1);
+        }
+
+        log::warn!("a6");
 
         self.is_prepared = true;
         Ok(())
@@ -297,13 +315,33 @@ impl GraphBuilder {
                         attribs.set_pen_width(val * 6.);
                     }
                 }
-                if Some(edge.source as usize) == settings.selected_node_id {
-                    attribs.set_label(&edge.label.clone().unwrap_or("".into()));
-                } else if Some(edge.target as usize) == settings.selected_node_id {
-                    attribs.set_label(&edge.label.clone().unwrap_or("".into()));
-                }
+                // if Some(edge.source as usize) == settings.selected_node_id {
+                //     attribs.set_label(&edge.label.clone().unwrap_or("".into()));
+                // } else if Some(edge.target as usize) == settings.selected_node_id {
+                //     attribs.set_label(&edge.label.clone().unwrap_or("".into()));
+                // }
             }
         }
         Ok(String::from_utf8(output_bytes)?)
     }
+}
+
+// TODO: prevent infinite recursion with a module having itself
+// as its parent
+fn name_to_fqn(name: &str, modules: &HashMap<String, GraphModule>) -> anyhow::Result<String> {
+    let mut ret: String = name.to_string();
+    loop {
+        let curr_module_str = ret.split("::").next().ok_or(anyhow::anyhow!("{} is an invalid event name. Ensure that it has a module specifier with module::event_name (module can be empty (::event))",name))?;
+        let curr_module = modules.get(curr_module_str);
+        let Some(curr_module) = curr_module else {
+            return Err(anyhow::anyhow!("Invalid module name {}", curr_module_str));
+        };
+        if curr_module.parent.is_some() {
+            ret.insert_str(0, "::");
+            ret.insert_str(0, &curr_module.parent.as_ref().unwrap());
+        } else {
+            break;
+        }
+    }
+    Ok(ret)
 }

@@ -9,38 +9,34 @@ import LoadingModal from './components/LoadingModal.js';
 import ExecutionInstanceList from './components/ExecutionInstanceList.js';
 import GraphViewer from './components/graphviewer.js';
 import { useRemoteResource } from './util.js';
-// import { Graphviz } from 'graphviz-react';
-// const useRemoteResource = (defaultVal, requestBody, endpoint) => {
-//   const [count, setCount] = useState(defaultVal);
-//   const requestOptions = {
-//     method: 'POST',
-//     headers: {'Content-Type': 'application/json'},
-//     body: JSON.stringify(requestBody)
-//   };
-//   useEffect(()=>{
-//     fetch('http://127.0.0.1:8080/'+endpoint,requestOptions)
-//       .then(response=>response.json())
-//       .then(data=>setCount(data))
-//   },[]);
-//   return [count,setCount];
-// };
+import { callRemote } from './util.js';
 
 function App() {
   const [count, _setCount] = useRemoteResource(5, { id: 21 }, 'ping');
-  const [ip, _setIp] = useRemoteResource(null, { trace_id: 0 }, 'instruction_pointer');
   const [generalInfo, _setGeneralInfo] = useRemoteResource(null, {}, 'general_info');
   const [currentNodeId, setCurrentNodeId] = useState(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState([])
   const updateCurrentNode = (newId) => {
     setCurrentNodeId(newId);
   }
-
   const [nodesData, setNodeData] = useRemoteResource(null, {}, 'node_data');
   const [currentExecutionInstances, setCurrentExecutionInstances] = useState([{ frame_time: 0, addr: 0, instance_of_addr: 0 }])
   const [isLoading, setIsLoading] = useState(false);
 
   const [currentFilePath, setCurrentFilePath] = useState("[none selected]");
   const [currentFileLineNum, setCurrentFileLineNum] = useState(1);
+  
+
+  const updateNodeData = (update_raw_fn) => {
+    console.log("UPDATED");
+    callRemote({}, 'get_raw_nodes_and_modules')
+      .then(resp => resp.json())
+      .then(dta => update_raw_fn(dta))
+      .then(dta => callRemote(dta,'update_raw_nodes_and_modules')
+        .then(_=>{})
+        .then(callRemote({},'node_data').then(resp=>resp.json()).then(resp=>setNodeData(resp)))
+      )
+  }
 
   return (
     <div className="App">
@@ -53,6 +49,7 @@ function App() {
             currentFilePath={currentFilePath}
             setCurrentFilePath={setCurrentFilePath}
             currentFileLineNum={currentFileLineNum}
+            updateNodeData={updateNodeData}
             setCurrentFileLineNum={setCurrentFileLineNum} />
           <GraphViewer
             nodesData={nodesData}
@@ -64,10 +61,15 @@ function App() {
           (<p>{"General and node data did not load. Did the backend crash?"}</p>)
       }
       {currentNodeId && nodesData && <div>
+        <div className='box-wrapper'>
         <NodeEditor
+          key={currentNodeId}
+          mode={"edit"}
           generalInfo={generalInfo}
+          updateNodeData={updateNodeData}
           nodesData={nodesData}
           currentNodeId={currentNodeId} />
+          </div>
          <ExecutionInstanceList 
            nodesData={nodesData} 
            currentNodeId={currentNodeId}
@@ -82,7 +84,6 @@ function App() {
 
       {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
       <p>{count.id}</p>
-      <p>{ip && ip.instruction_pointer}</p>
       {/* <p>{generalInfo && JSON.stringify(generalInfo)}</p> */}
     </div>
   );

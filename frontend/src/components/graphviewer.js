@@ -32,7 +32,8 @@ const GraphViewer = (props) => {
   // }, []);
   const setCurrentFile = props.setCurrentFile;
   const id = useMemo(getId, []);
-  const [dotSrc, setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph');
+  const [dotSrc, setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph',[props.nodesData]);
+  console.log(props.nodesData);
 
   const defaultOptions = {
     fit: false,

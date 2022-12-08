@@ -93,8 +93,9 @@ h3 {
 }
 .box-wrapper {
   background-color: #295b64;
-  margin: 5px;
-  padding: 5px;
+  margin: 6px;
+  padding: 1px 4px 10px 10px;
+  border-radius: 2px;
 }
 .lane-viewer {
   background-color: #295b64;
@@ -170,6 +171,7 @@ position: absolute;
 top: 0;
 bottom: 0;
 left: 0;
+z-index:10000;
 right: 0;
 background-color: rgba(0, 0, 0, 0.5);
 }
@@ -177,6 +179,7 @@ background-color: rgba(0, 0, 0, 0.5);
 .text-modal-content {
 background-color: white;
 padding: 20px;
+z-index:10001;
 border-radius: 10px;
 box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.3);
 }
@@ -196,6 +199,48 @@ cursor: pointer;
 }
 
 .text-modal-close:hover {
+background-color: #333;
+}
+.add-node-modal-container {
+position: fixed;
+top: 0;
+bottom: 0;
+left: 0;
+right: 0;
+display: flex;
+justify-content: center;
+align-items: center;
+}
+
+.add-node-modal-background {
+position: absolute;
+top: 0;
+bottom: 0;
+left: 0;
+z-index:10000;
+right: 0;
+background-color: rgba(0, 0, 0, 0.5);
+}
+
+.add-node-modal-content {
+background-color: white;
+padding: 20px;
+z-index:10001;
+border-radius: 10px;
+box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.3);
+}
+
+
+.add-node-modal-close {
+background-color: #aaa;
+color: white;
+padding: 10px;
+border: none;
+border-radius: 5px;
+cursor: pointer;
+}
+
+.add-node-modal-close:hover {
 background-color: #333;
 }
 /*Loading modal*/
@@ -324,8 +369,9 @@ position: relative;
 
 .string-completion-input input {
 width: 100%;
-padding: 8px 12px;
+padding: 8px 2px;
 border: 1px solid #ccc;
+z-index: 100;
 border-radius: 4px;
 font-size: 16px;
 }

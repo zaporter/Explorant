@@ -5,6 +5,7 @@ import {Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 //import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import StringCompletionInput from './StringCompletionInput.js';
+import AddNodeModal from './AddNodeModal.js';
 const SrcViewer = (props) => {
   let nodesData = props.nodesData;
   
@@ -41,7 +42,9 @@ const SrcViewer = (props) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
-  const [clickedLine, setClickedLine] = useState(null);
+  var clickedLineNum = 0;
+  const [showAddNodeModal, setShowAddNodeModal] = useState(false);
+
   const handleRightClick = (e) => {
     e.preventDefault();
     setShowDropdown(true);
@@ -49,6 +52,8 @@ const SrcViewer = (props) => {
     setY(e.pageY);
   }
    const addEvent = () => {
+     setShowAddNodeModal(true);
+     setShowDropdown(false);
     // Add Event code here
   }
 
@@ -72,6 +77,7 @@ const SrcViewer = (props) => {
           </div>
         </div>
       )}
+
   <div className="src-viewer">
     <h3>{"Source Viewer"}</h3>
     <p>{`Viewing ${props.currentFilePath}`}</p>
@@ -102,7 +108,7 @@ const SrcViewer = (props) => {
           //style.onClick = () => {console.log("test")};
           let onClick = () => {console.log("test")}
           let onContextMenu = (e) => {
-            setClickedLine(lineNumber);
+            clickedLineNum = lineNumber;
             handleRightClick(e);
           };
           return { style, onContextMenu};
@@ -114,6 +120,8 @@ const SrcViewer = (props) => {
       </div>
     </div>
     </div>
+
+    {showAddNodeModal && <AddNodeModal onClose={()=>{setShowAddNodeModal(false)}} child_props={{"nodesData":props.nodesData}}/>}
     </div>
   );
 }

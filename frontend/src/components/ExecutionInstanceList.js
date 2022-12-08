@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useRemoteResource } from '../util.js';
 import { callRemote } from '../util.js';
+import TextModal from './TextModal.js';
 
 const ExecutionInstanceList = (props) => {
   // Declare a state variable to store the currently hovered item
   const [hoveredItem, setHoveredItem] = useState(null);
 
+  const [modalText, setModalText] = useState(null);
   let setExecutionInstances = props.setExecutionInstances;
   let nodesData = props.nodesData;
   let currentNodeId = props.currentNodeId;
@@ -21,19 +23,19 @@ const ExecutionInstanceList = (props) => {
     setHoveredItem(item);
 
   }
-  const [message, setMessage] = useState("Click on one of the executions to start a gdb server at that location");
 
   // Function to handle click events on list items
   const handleClick = (item) => {
     callRemote({ "start_time": item }, "create_gdb_server")
       .then(response => response.json())
-      .then(response => setMessage(response.value));
+      .then(response => setModalText(`To go to this spot in the trace, run: ${response.value}`));
   }
 
   return (
     <div className="box-wrapper">
       <h3>{"Execution Instances:"}</h3>
-      <p>{message}</p>
+      <p>{"Click one of the instances below to start a gdb server at that location:"}</p>
+      {modalText && <TextModal text={modalText} onClose={()=>setModalText(null)}/>}
 
 
       <table className="execution-instance-list">

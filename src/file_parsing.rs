@@ -80,12 +80,19 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
+
+                    let mut t_name = name.clone();
+                    let mut mn_iter = t_name.split("::");
+                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a module"))?;
+                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a node"))?;
                     nodes.insert(
                         event_addr,
                         GraphNode {
                             FQN: name,
                             address: event_addr,
-                            node_type: "event".into(),
+                            module: m_name.into(),
+                            name: n_name.into(),
+                            node_type: "flow".into(),
                             location: LineLocation {
                                 file: file_name.clone(),
                                 line_num: (final_offset + line_num) as u32,
@@ -114,11 +121,17 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                         return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
                     };
                     log::info!("Registered event {}, ", name);
+                    let mut t_name = name.clone();
+                    let mut mn_iter = t_name.split("::");
+                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a module"))?;
+                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a node"))?;
                     nodes.insert(
                         event_addr,
                         GraphNode {
-                            FQN: name,
+                            FQN: name.clone(),
                             address: event_addr,
+                            module: m_name.into(),
+                            name: n_name.into(),
                             node_type: "event".into(),
                             location: LineLocation {
                                 file: file_name.clone(),

@@ -53,6 +53,35 @@ fn get_symbols<'a>(file : &'a object::File) -> Result<Vec<(String,object::Symbol
 }
 
 impl Simulation {
+    pub fn reset_the_bin_interface(&self) -> anyhow::Result<BinaryInterface>{
+        let mut bin_interface = BinaryInterface::new_at_target_event(0, self.save_directory.clone());
+        let cthread = bin_interface.get_current_thread();
+        bin_interface.pin_mut().set_query_thread(cthread);
+        bin_interface.set_pass_signals(vec![
+            0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
+        ]);
+        //let rip = bin_interface
+        //    .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+        //    .to_usize();
+        //dbg!(rip);
+
+        //let mut stack_info = TrampolineStackInfo {
+        //    base_addr: 0x71000000,
+        //    // Ive had success with 65KiB 
+        //    // but I made it 256 MiB just in case. 
+        //    // This shouldn't overflow
+        //    //
+        //    //NOTE: 
+        //    //  This is consistently faster on my machine if 
+        //    //  it is given 1GiB instead of 256MiB. 
+        //    size: 0x10000000,
+        //    reserved_space: 0x40,
+        //};
+        //stack_info.allocate_map(&mut bin_interface);
+        //stack_info.setup_stack_ptr(&mut bin_interface).unwrap();
+
+        Ok(bin_interface)
+    }
     pub fn new(directory:PathBuf) -> anyhow::Result<Self> {
         let mut bin_interface = BinaryInterface::new_at_target_event(0, directory.clone());
         let cthread = bin_interface.get_current_thread();

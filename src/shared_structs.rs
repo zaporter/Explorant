@@ -54,6 +54,27 @@ pub_struct!(AllSourceFilesResponse{
     files : Vec<PathBuf>
 });
 
+// pub_struct!(ParentNode{
+    
+// });
+// This is not synoptic nodes but rather raw nodes. 
+// Modules are the same
+pub_struct!(UpdateRawNodesAndModulesRequest{
+    nodes : HashMap<usize,GraphNode>,
+    modules : HashMap<String,GraphModule>,
+});
+
+pub_struct!(UpdateRawNodesAndModulesResponse{
+});
+
+pub_struct!(GetRawNodesAndModulesRequest{
+});
+
+pub_struct!(GetRawNodesAndModulesResponse{
+    nodes : HashMap<usize,GraphNode>,
+    modules : HashMap<String,GraphModule>,
+});
+
 pub_struct!(RecordedFramesRequest { trace_id: TraceID });
 pub_struct!(RecordedFramesResponse{
     frames: HashMap<String, Vec<u8>>,
@@ -77,6 +98,8 @@ pub_struct!(GraphModule{
 });
 pub_struct!(GraphNode {
     FQN:String,
+    module:String,
+    name:String,
     address:usize,
     node_type: String,
     location: LineLocation,
