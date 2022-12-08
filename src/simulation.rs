@@ -11,6 +11,7 @@ use object::{
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
 
+use crate::gdb_instance_manager::GdbInstanceManager;
 use crate::{main, file_parsing};
 use crate::shared_structs::LineLocation;
 use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs::{FrameTimeMap, GraphNode}, erebor::Erebor, graph_builder::GraphBuilder};
@@ -21,6 +22,7 @@ use crate::{trampoline::{TrampolineManager, TrampolineStackInfo}, shared_structs
 // struct otherwise you have to update the 
 // lock order across the codebase
 pub struct Simulation{
+    pub gdb_instance_mgr : Mutex<GdbInstanceManager>,
     pub bin_interface : Mutex<BinaryInterface>,
     pub trampoline_manager : Mutex<TrampolineManager>,
     pub proc_map: Mutex<Lapper<usize,Map>>,
@@ -121,6 +123,7 @@ impl Simulation {
             save_directory: directory,
             dwarf_data: Mutex::new(dwarf_data),
             graph_builder:Mutex::new(g_builder),
+            gdb_instance_mgr: Mutex::new(GdbInstanceManager::default()),
             // symbol_table:Mutex::new(symbols),
         })
 

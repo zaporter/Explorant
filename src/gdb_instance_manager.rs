@@ -1,17 +1,44 @@
-use std::thread::JoinHandle;
+use std::{thread::JoinHandle, collections::HashMap};
 
 use anyhow::bail;
 use librr_rs::*;
 
 use crate::{shared_structs::TimeStamp, simulation::Simulation};
 
-struct GdbInstanceManager {
-    instances: Vec<RunningGdbInstance>,
+const SHOULD_WAIT_TILL_RUNNING : bool = false;
+
+#[derive(Default)]
+pub struct GdbInstanceManager {
+    instances: HashMap<TimeStamp, RunningGdbInstance>,
+}
+impl GdbInstanceManager {
+    pub fn is_running(&self, ts: &TimeStamp) -> bool {
+        let Some(inst) = self.instances.get(ts) else {
+            return false;
+        };
+        inst.is_alive()
+    }
+    // pub fn get_instance(&self, ts:&TimeStamp) -> &
+    pub fn create_instance(&mut self, ts: &TimeStamp, simulation: &Simulation)->anyhow::Result<String>{
+        let inst = RunningGdbInstance::spawn(ts, simulation)?;
+        let to_ret = inst.2.clone();
+        if SHOULD_WAIT_TILL_RUNNING && inst.wait_till_running().is_err(){
+            return bail!("Err: {:?}",inst.join());
+
+        }else {
+            self.instances.insert(ts.clone(), inst);
+            Ok(to_ret)
+        }
+    }
+    pub fn kill(&self, ts: &TimeStamp) {
+        todo!()
+    }
 }
 
 struct RunningGdbInstance(TimeStamp, JoinHandle<anyhow::Result<()>>, String, u16);
 impl RunningGdbInstance {
     pub fn spawn(start_loc: &TimeStamp, simulation: &Simulation) -> anyhow::Result<Self> {
+        dbg!(&start_loc);
         let port = port_scanner::request_open_port().ok_or(anyhow::Error::msg("No open ports!"))?;
         let exe= simulation.bin_interface.lock().unwrap().get_exec_file();
         
@@ -20,7 +47,7 @@ impl RunningGdbInstance {
         let start_loc = start_loc.clone();
         let handler = std::thread::spawn(move || {
             let mut bin_interface = BinaryInterface::new_at_target_event(
-                start_loc.frame_time as i64,
+                start_loc.frame_time as i64 - 1,
                 save_directory,
             );
 
@@ -88,7 +115,7 @@ impl RunningGdbInstance {
     }
     pub fn wait_till_running(&self) -> anyhow::Result<()>{
         // While it is available, we haven't finished
-        while port_scanner::local_port_available(self.3) {
+        while !port_scanner::scan_port(self.3) {
             if !self.is_alive() {
                 bail!("Failed to launch before port opened!");
             }else {

@@ -49,6 +49,10 @@ pub_struct!(AddrOccurrencesRequest{
 pub_struct!(AddrOccurrenceResponse{
     val: Vec<TimeStamp>,
 });
+pub_struct!(AllSourceFilesRequest{});
+pub_struct!(AllSourceFilesResponse{
+    files : Vec<PathBuf>
+});
 
 pub_struct!(RecordedFramesRequest { trace_id: TraceID });
 pub_struct!(RecordedFramesResponse{
@@ -101,11 +105,12 @@ pub_struct!(TimeRange {
     end: TimeStamp,
 });
 
-pub_struct!(TimeStamp{
-    frame_time:usize,
-    addr:Option<usize>,
-    instance_of_addr:Option<usize>,
-});
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)] 
+pub struct TimeStamp{
+    pub frame_time:usize,
+    pub addr:Option<usize>,
+    pub instance_of_addr:Option<usize>,
+}
 impl TimeStamp {
     pub fn new_at_ft(frame_time: usize) -> Self {
         Self {

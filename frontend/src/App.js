@@ -36,11 +36,10 @@ function App() {
   }
 
   const [nodesData, setNodeData] = useRemoteResource(null, {}, 'node_data');
-  const [currentFile, setCurrentFile] = useState({ file: "", line: 0 });
   const [currentExecutionInstances, setCurrentExecutionInstances] = useState([{ frame_time: 0, addr: 0, instance_of_addr: 0 }])
   const [isLoading, setIsLoading] = useState(false);
 
-  const [currentFilePath, setCurrentFilePath] = useState(null);
+  const [currentFilePath, setCurrentFilePath] = useState("[none selected]");
   const [currentFileLineNum, setCurrentFileLineNum] = useState(1);
 
   return (

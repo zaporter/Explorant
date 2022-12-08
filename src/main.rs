@@ -185,9 +185,12 @@ async fn create_gdb_server(
     req: web::Json<CreateGdbServerRequest>,
 ) -> HttpResponse {
     let req = req.0;
+    let simulation = &data.get_ref().traces[0];
+    let mut gdb_instance_manager = data.get_ref().traces[0].gdb_instance_mgr.lock().unwrap();
+    let to_ret = gdb_instance_manager.create_instance(&req.start_time, simulation);
     // TODO
     let response = CreateGdbServerResponse {
-        value: format!("rm -rf / {}", req.start_time.frame_time),
+        value: to_ret.unwrap_or_else(|m| format!("ERROR CREATING SERVER. {m}")),
     };
     HttpResponse::Ok().json(response)
 }
@@ -212,6 +215,18 @@ async fn get_node_data(
     let resp = NodeDataResponse {
         modules: graph_builder.modules.clone(),
         nodes: graph_builder.synoptic_nodes.clone(),
+    };
+    HttpResponse::Ok().json(resp)
+}
+async fn get_all_source_files(
+    data: web::Data<Arc<SimulationStorage>>,
+    _req: web::Json<NodeDataRequest>,
+) -> HttpResponse {
+    let erebor = data.get_ref().traces[0].dwarf_data.lock().unwrap();
+    let out = erebor.files.keys().map(|k| (*k).clone()).collect();
+    
+    let resp = AllSourceFilesResponse {
+        files: out
     };
     HttpResponse::Ok().json(resp)
 }
@@ -309,6 +324,7 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/get_settings").route(web::post().to(get_settings)))
             .service(web::resource("/create_gdb_server").route(web::post().to(create_gdb_server)))
             .service(web::resource("/addr_occurrences").route(web::post().to(get_addr_occurrences)))
+            .service(web::resource("/source_files").route(web::post().to(get_all_source_files)))
     })
     .workers(1)
     .bind((ip, port))?

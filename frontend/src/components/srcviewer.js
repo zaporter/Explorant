@@ -14,9 +14,12 @@ const SrcViewer = (props) => {
   useEffect(()=>{setCenteredLine(props.currentFileLineNum)},[props.currentFileLineNum]);
 
 
-  let valid_files = ["/home/zack/test","/home/zack/chicken"];
-  let [cf,setCf] = useState("/home/zack/test");
-  const onUpdate = (new_val) => {setCf(new_val)};
+  const [allFiles, _setAllFiles] = useRemoteResource({files:["[none selected]"]},{}, 'source_files');
+
+  const onUpdate = (new_val) => {
+    props.setCurrentFileLineNum(0);
+    props.setCurrentFilePath(new_val)
+  };
   const [data, _setData] = useRemoteResource({data:""}, {file_name: currentFile.file}, "source_file", [props.currentFilePath]);
   let lines = data.data.split("\n");
   
@@ -71,11 +74,12 @@ const SrcViewer = (props) => {
       )}
   <div className="src-viewer">
     <h3>{"Source Viewer"}</h3>
-    <p>{`Viewing ${cf}`}</p>
+    <p>{`Viewing ${props.currentFilePath}`}</p>
     <StringCompletionInput 
-      default={cf}
+      key={props.currentFilePath}
+      default={props.currentFilePath}
       onUpdate={onUpdate}
-      list={valid_files}
+      list={allFiles.files.concat(["[none selected]"])}
       />
     <div className="src-inner" 
       onWheel={handleScroll}
