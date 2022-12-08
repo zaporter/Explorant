@@ -95,14 +95,12 @@ const SrcViewer = (props) => {
       <SyntaxHighlighter 
         language="clike" 
         style={a11yDark} 
-        startingLineNumber={minLine}
+        startingLineNumber={minLine+1}
         showLineNumbers={true} 
         wrapLines={true}
         lineProps={(lineNumber) => {
-          console.log(lineNumber);
           const style = { display: "block", width: "fit-content" };
-          console.log(lineNumber);
-          if (currentFile.line_num == lineNumber+1) {
+          if (currentFile.line_num == lineNumber) {
             style.backgroundColor = "#ca0a0a";
           }
           //style.onClick = () => {console.log("test")};

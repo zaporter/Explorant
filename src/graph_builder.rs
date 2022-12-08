@@ -15,6 +15,7 @@ use std::fs::{self, File, OpenOptions};
 use std::ops::Range;
 
 use crate::address_recorder::{self, AddrIter};
+use crate::file_parsing;
 use crate::shared_structs::{GraphModule, Settings};
 use crate::{
     address_recorder::AddressRecorder,
@@ -65,7 +66,7 @@ impl GraphBuilder {
         for mut node in &mut nodes.values_mut() {
             // Update for empty FQN and
             // also update in case module changed. 
-            node.FQN = name_to_fqn(&format!("{}::{}", &node.module, &node.name), &self.modules)?;
+            node.FQN = file_parsing::name_to_fqn(&format!("{}::{}", &node.module, &node.name), &self.modules)?;
         }
         self.nodes = nodes;
         Ok(())
@@ -326,22 +327,3 @@ impl GraphBuilder {
     }
 }
 
-// TODO: prevent infinite recursion with a module having itself
-// as its parent
-fn name_to_fqn(name: &str, modules: &HashMap<String, GraphModule>) -> anyhow::Result<String> {
-    let mut ret: String = name.to_string();
-    loop {
-        let curr_module_str = ret.split("::").next().ok_or(anyhow::anyhow!("{} is an invalid event name. Ensure that it has a module specifier with module::event_name (module can be empty (::event))",name))?;
-        let curr_module = modules.get(curr_module_str);
-        let Some(curr_module) = curr_module else {
-            return Err(anyhow::anyhow!("Invalid module name {}", curr_module_str));
-        };
-        if curr_module.parent.is_some() {
-            ret.insert_str(0, "::");
-            ret.insert_str(0, &curr_module.parent.as_ref().unwrap());
-        } else {
-            break;
-        }
-    }
-    Ok(ret)
-}

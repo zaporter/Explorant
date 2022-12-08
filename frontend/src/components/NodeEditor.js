@@ -4,12 +4,12 @@ import StringCompletionInput from './StringCompletionInput.js';
 const NodeEditor = (props) => {
   let nodesData = props.nodesData;
   let nid = props.currentNodeId;
+  const node = nodesData.nodes[nid];
   let validModules = Object.keys(nodesData.modules);
-  const [selectedModule, setSelectedModule] = useState('');
+  const [selectedModule, setSelectedModule] = useState(props.mode=="add" ? '' : node.module);
   const onUpdateModule = (new_val) => {
     setSelectedModule(new_val);
   }
-  const node = nodesData.nodes[nid];
   const [name, setName] = useState(props.mode=='add'?props.name:node.name);
   const [type, setType] = useState(props.mode=='add'?'Event':node.node_type);
   const [lineLocation, setLineLocation] = useState(props.mode=='add'?props.line:node.location.line_num);
@@ -35,6 +35,8 @@ const NodeEditor = (props) => {
     let addr = nodesData.nodes[nid].address;
     let update_raw_fn = (raw_n_data) => {
       raw_n_data.nodes[addr].name=name;
+      console.log(raw_n_data.nodes[addr].module);
+      console.log(selectedModule);
       raw_n_data.nodes[addr].module=selectedModule;
       return raw_n_data;
     } 
@@ -60,7 +62,7 @@ const NodeEditor = (props) => {
       <label className="node-editor__label">
         Module:
         <StringCompletionInput 
-          default={props.mode=="add" ? '' : node.module}
+          default={selectedModule}
           onUpdate={onUpdateModule}
           list={validModules}
           />

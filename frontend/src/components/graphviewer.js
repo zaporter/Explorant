@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { unstable_batchedUpdates } from 'react-dom';
 import { useEffect, useMemo } from 'react';
 import { graphviz } from 'd3-graphviz';
 import { useRemoteResource } from '../util.js';
@@ -59,7 +60,6 @@ const GraphViewer = (props) => {
   const interactive = () => {
     console.log("interactive");
     let nodes = d3.selectAll('.node,.edge');
-    console.log(d3);
     nodes
       .on("click", function() {
         console.log(this);
@@ -76,10 +76,15 @@ const GraphViewer = (props) => {
           .then(response => response.json())
           .then(old_settings => { old_settings.selected_node_id = key; return old_settings })
           .then(new_settings => update_settings_and_redraw(new_settings))
-          .then(_ => updateCurrentNode_int(key))
+          // .then(_ => updateCurrentNode_int(key))
+          .then(_ => unstable_batchedUpdates(()=>{
+              updateCurrentNode_int(key)
+              props.setCurrentFilePath(respective.location.file)
+              props.setCurrentFileLineNum(respective.location.line_num)
+          }))
         // .then(_=>setNodeName(respective.FQN))
-          .then(_ => props.setCurrentFilePath(respective.location.file))
-          .then(_ => props.setCurrentFileLineNum(respective.location.line_num));
+          // .then(_ => props.setCurrentFilePath(respective.location.file))
+          // .then(_ => props.setCurrentFileLineNum(respective.location.line_num));
         // callRemote({}, "get_settings")
         //   .then(response=>response.json())
         //   .then(old_settings=>console.log(old_settings))

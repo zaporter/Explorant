@@ -155,7 +155,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
 }
 // TODO: prevent infinite recursion with a module having itself
 // as its parent
-fn name_to_fqn(name: &str, modules: &HashMap<String, GraphModule>) -> anyhow::Result<String> {
+pub fn name_to_fqn(name: &str, modules: &HashMap<String, GraphModule>) -> anyhow::Result<String> {
     let mut ret: String = name.to_string();
     loop {
         let curr_module_str = ret.split("::").next().ok_or(anyhow::anyhow!("{} is an invalid event name. Ensure that it has a module specifier with module::event_name (module can be empty (::event))",name))?;

@@ -22,6 +22,7 @@ const RECORDING_TEMP_TIMES_NAME: &str = "unique_temp_recording_output_times.txt"
 pub fn record(
     exe_path: &PathBuf,
     output_directory: &PathBuf,
+    record_screen: bool,
     exe_args: Option<&str>,
 ) -> anyhow::Result<()> {
     remove_dir_all(output_directory);
@@ -37,7 +38,9 @@ pub fn record(
     // brittle. Refactor to use pipes from the child
     // to read stdout and stderr to decide when
     // ffmpeg is ready to start recording frames
-    let child = Command::new("/usr/bin/ffmpeg")
+
+    let child = if record_screen {
+        Some(Command::new("/usr/bin/ffmpeg")
         .arg("-f")
         .arg("x11grab")
         .arg("-framerate")
@@ -68,9 +71,14 @@ pub fn record(
         .arg("0")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()?;
+        .spawn()?)
+    } else {
+        None
+    };
 
-    thread::sleep(Duration::from_millis(5000));
+    if record_screen {
+        thread::sleep(Duration::from_millis(5000));
+    }
     let mut rec_interface = RecordingInterface::new(format!(
         "--output-trace-dir {} {} {}",
         output_directory_str,
@@ -91,65 +99,82 @@ pub fn record(
                 .as_millis(),
         );
     }
-    thread::sleep(Duration::from_millis(1000));
-    // dbg!(child.id());
-    signal::kill(Pid::from_raw(child.id() as i32), Signal::SIGINT)?;
+    if record_screen {
+        thread::sleep(Duration::from_millis(1000));
+        signal::kill(Pid::from_raw(child.unwrap().id() as i32), Signal::SIGINT)?;
+        thread::sleep(Duration::from_millis(2000));
+        create_dir_all(format!("{}/frames", output_directory_str))?;
+    }
 
-    thread::sleep(Duration::from_millis(2000));
-
-    create_dir_all(format!("{}/frames", output_directory_str))?;
-    // extract all frames
-    let mut child = Command::new("/usr/bin/ffmpeg")
-        .arg("-i")
-        .arg(RECORDING_TEMP_FILE_NAME)
-        .arg(format!("{}/frames/out-%06d.jpg", output_directory_str))
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
-    child.wait()?;
-    let frames_dir = read_dir(format!("{}/frames", output_directory_str))?;
-    let frames_names = frames_dir.map(|f| f.unwrap().file_name()).sorted();
-    let frame_times_str = read_to_string(RECORDING_TEMP_TIMES_NAME)?;
     let mut frametimemap = FrameTimeMap {
         frames: Vec::new(),
         times: HashMap::new(),
     };
-    // correlate the recorded times and frames with the recorded times and frame_times
-    // insert everything into the frametimemap
-    // let mut last_real_time = 0;
-    // Add first frame before starting
-    frametimemap.frames.push((
-        1,
-        *frame_times_to_system_milis.get(&1).ok_or_else(|| {
-            anyhow::Error::msg("Didn't have an entry for the first frame time. Please report this.")
-        })?,
-        "frames/out-000001.jpg".into(),
-    ));
-    // Add all frames during execution
-    
-    for (time_str, frame_img_entry) in frame_times_str.split("\n").skip(1).zip(frames_names.clone()) {
-        let time = time_str.parse::<u128>()? + 1500000000000;
-        for (current_entry, next_entry) in frame_times_to_system_milis.iter().sorted_by_key(|a| a.0).tuple_windows() {
-            if current_entry.1 < &time && next_entry.1>= &time {
-                frametimemap.frames.push((
-                    *current_entry.0,
-                    time,
-                    format!("frames/{}", frame_img_entry.to_str().unwrap()),
-                ));
+    // extract all frames
+    if record_screen {
+        let mut child = Command::new("/usr/bin/ffmpeg")
+            .arg("-i")
+            .arg(RECORDING_TEMP_FILE_NAME)
+            .arg(format!("{}/frames/out-%06d.jpg", output_directory_str))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?;
+        child.wait()?;
+        let frames_dir = read_dir(format!("{}/frames", output_directory_str))?;
+        let frames_names = frames_dir.map(|f| f.unwrap().file_name()).sorted();
+        let frame_times_str = read_to_string(RECORDING_TEMP_TIMES_NAME)?;
+
+        // correlate the recorded times and frames with the recorded times and frame_times
+        // insert everything into the frametimemap
+        // let mut last_real_time = 0;
+        // Add first frame before starting
+        frametimemap.frames.push((
+            1,
+            *frame_times_to_system_milis.get(&1).ok_or_else(|| {
+                anyhow::Error::msg(
+                    "Didn't have an entry for the first frame time. Please report this.",
+                )
+            })?,
+            "frames/out-000001.jpg".into(),
+        ));
+        // Add all frames during execution
+
+        for (time_str, frame_img_entry) in frame_times_str
+            .split("\n")
+            .skip(1)
+            .zip(frames_names.clone())
+        {
+            let time = time_str.parse::<u128>()? + 1500000000000;
+            for (current_entry, next_entry) in frame_times_to_system_milis
+                .iter()
+                .sorted_by_key(|a| a.0)
+                .tuple_windows()
+            {
+                if current_entry.1 < &time && next_entry.1 >= &time {
+                    frametimemap.frames.push((
+                        *current_entry.0,
+                        time,
+                        format!("frames/{}", frame_img_entry.to_str().unwrap()),
+                    ));
+                }
             }
         }
-    }
-    // Add first frame after execution
-    {
-        let (last_ft, last_ft_time) = frame_times_to_system_milis.iter().sorted_by_key(|a| a.0).last().ok_or_else(|| anyhow::Error::msg("No last frame to save"))?;
-        let last_frame_name = frames_names.last().ok_or_else(|| anyhow::Error::msg("No last frame. Did ffmpeg start?"))?;
-        frametimemap.frames.push((
-            *last_ft,
-            *last_ft_time,
-            format!("frames/{}", last_frame_name.to_str().unwrap()),
-        ));
-
-        
+        // Add first frame after execution
+        {
+            let (last_ft, last_ft_time) = frame_times_to_system_milis
+                .iter()
+                .sorted_by_key(|a| a.0)
+                .last()
+                .ok_or_else(|| anyhow::Error::msg("No last frame to save"))?;
+            let last_frame_name = frames_names
+                .last()
+                .ok_or_else(|| anyhow::Error::msg("No last frame. Did ffmpeg start?"))?;
+            frametimemap.frames.push((
+                *last_ft,
+                *last_ft_time,
+                format!("frames/{}", last_frame_name.to_str().unwrap()),
+            ));
+        }
     }
 
     frametimemap.times = frame_times_to_system_milis;
@@ -161,9 +186,11 @@ pub fn record(
         serde_json::to_string(&frametimemap)?
     )?;
 
-    remove_file(RECORDING_TEMP_TIMES_NAME)?;
-    remove_file(RECORDING_TEMP_FILE_NAME)?;
-    thread::sleep(Duration::from_millis(3000));
+    if record_screen {
+        remove_file(RECORDING_TEMP_TIMES_NAME)?;
+        remove_file(RECORDING_TEMP_FILE_NAME)?;
+        thread::sleep(Duration::from_millis(3000));
+    }
 
     println!("Finished Recording");
     Ok(())
@@ -199,7 +226,7 @@ mod tests {
         let save_dir = std::env::temp_dir().join(format!("mqp_temp_{}", random_number.to_string()));
         let mut output = String::new();
         let mut stdout_buf = BufferRedirect::stdout().unwrap();
-        super::record(&exe_dir, &save_dir, None)?;
+        super::record(&exe_dir, &save_dir, true, None)?;
         stdout_buf.read_to_string(&mut output).unwrap();
         drop(stdout_buf);
         assert!(output.contains("Started"));
@@ -220,7 +247,7 @@ mod tests {
         let save_dir = std::env::temp_dir().join(format!("mqp_temp_{}", random_number.to_string()));
         let mut output = String::new();
         let mut stdout_buf = BufferRedirect::stdout().unwrap();
-        super::record(&exe_dir, &save_dir, Some("100"))?;
+        super::record(&exe_dir, &save_dir, true, Some("100"))?;
         stdout_buf.read_to_string(&mut output).unwrap();
         drop(stdout_buf);
         assert!(output.contains("Started"));
@@ -250,7 +277,7 @@ mod tests {
         // log::error!("{:?}",&save_dir);
         let mut output = String::new();
         let mut stdout_buf = BufferRedirect::stdout().unwrap();
-        super::record(&exe_dir, &save_dir, Some("10000"))?;
+        super::record(&exe_dir, &save_dir, true, Some("10000"))?;
         stdout_buf.read_to_string(&mut output).unwrap();
         drop(stdout_buf);
         assert!(output.contains("Started"));

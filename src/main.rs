@@ -70,6 +70,8 @@ enum Commands {
         exe: PathBuf,
         #[arg(short, long, value_name = "FOLDER")]
         save_dir: PathBuf,
+        #[arg(short, long, default_value = "false" ,value_name = "SHOULD RECORD WITH FFMPEG")]
+        record_screen: bool
     },
     Serve {
         //#[arg(short, long, value_name = "FOLDER1 FOLDER2 ...")]
@@ -237,9 +239,6 @@ async fn update_raw_nodes_and_modules(
     req: web::Json<UpdateRawNodesAndModulesRequest>,
 ) -> HttpResponse {
     let req = req.0;
-    log::error!("UPDATE");
-    //let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
-    log::error!("UPDATE_3");
 
     let mut bin_interface = BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
     let cthread = bin_interface.get_current_thread();
@@ -247,9 +246,6 @@ async fn update_raw_nodes_and_modules(
     bin_interface.set_pass_signals(vec![
         0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
     ]);
-    log::error!("UPDATE_4");
-
-    log::error!("UPDATE2");
     // let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
     let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     log::error!("UPDATE_2");
@@ -314,8 +310,8 @@ async fn main() -> std::io::Result<()> {
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Record { exe, save_dir } => {
-            recorder::record(exe, save_dir, None);
+        Commands::Record { exe, save_dir, record_screen } => {
+            recorder::record(exe, save_dir, *record_screen, None);
             Ok(())
         }
         Commands::Serve { traces } => {
