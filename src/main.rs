@@ -238,10 +238,10 @@ async fn update_raw_nodes_and_modules(
 ) -> HttpResponse {
     let req = req.0;
     log::error!("UPDATE");
-    let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
+    //let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
     log::error!("UPDATE_3");
 
-    *bin_interface = BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
+    let mut bin_interface = BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
     let cthread = bin_interface.get_current_thread();
     bin_interface.pin_mut().set_query_thread(cthread);
     bin_interface.set_pass_signals(vec![
@@ -251,12 +251,12 @@ async fn update_raw_nodes_and_modules(
 
     log::error!("UPDATE2");
     // let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
-    // let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
-    // log::error!("UPDATE_2");
-    // graph_builder.update_raw_modules(req.modules).unwrap();
-    // graph_builder.update_raw_nodes(req.nodes).unwrap();
-    // log::error!("UPDATE_3");
-    // graph_builder.prepare(&mut bin_interface);
+    let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
+    log::error!("UPDATE_2");
+    graph_builder.update_raw_modules(req.modules).unwrap();
+    graph_builder.update_raw_nodes(req.nodes).unwrap();
+    log::error!("UPDATE_3");
+    graph_builder.prepare(&mut bin_interface);
 
     let resp = UpdateRawNodesAndModulesResponse {
     };

@@ -135,7 +135,7 @@
 ::glibc::malloc::Check largebin
 ::glibc::malloc::mark bin
 ::glibc::malloc::Failed attempt. Trying again
-::start::Assign 10 to k 0
+::Assign 10 to k 1
 ::Print k
 ::cleanup::free k
 ::glibc::malloc::tag chunk

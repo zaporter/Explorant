@@ -59,6 +59,7 @@ const GraphViewer = (props) => {
   const interactive = () => {
     console.log("interactive");
     let nodes = d3.selectAll('.node,.edge');
+    console.log(d3);
     nodes
       .on("click", function() {
         console.log(this);
