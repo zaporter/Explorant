@@ -15,6 +15,7 @@ use std::fs::{self, File, OpenOptions};
 use std::ops::Range;
 
 use crate::address_recorder::{self, AddrIter};
+use crate::erebor::Erebor;
 use crate::file_parsing;
 use crate::shared_structs::{GraphModule, Settings};
 use crate::{
@@ -61,17 +62,59 @@ impl GraphBuilder {
     // pub fn get_parent_tree_nodes_syn() -> Option<Vec<usize>>{
 
     // }
-    pub fn update_raw_nodes(&mut self,mut nodes: HashMap<usize,GraphNode>) -> anyhow::Result<()>{
+    pub fn update_raw_nodes(
+        &mut self,
+        mut nodes: HashMap<usize, GraphNode>,
+        erebor: &Erebor,
+    ) -> anyhow::Result<()> {
         self.is_prepared = false;
+
         for mut node in &mut nodes.values_mut() {
             // Update for empty FQN and
-            // also update in case module changed. 
-            node.FQN = file_parsing::name_to_fqn(&format!("{}::{}", &node.module, &node.name), &self.modules)?;
+            // also update in case module changed.
+            node.FQN = file_parsing::name_to_fqn(
+                &format!("{}::{}", &node.module, &node.name),
+                &self.modules,
+            )?;
+
+            // Should only impose minor perf pentalty on future runs
+            // as the naive_line_num will be accurate on future executions
+            // (final_offset will be 0)
+            let naive_line_num = node.location.line_num;
+            let file_info = erebor.files.get(&node.location.file).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "File name for {} was not inside of the DWARF data for the binary. ",
+                    node.FQN
+                )
+            })?;
+            let mut event_addr = None;
+            let mut final_offset = 0;
+            'addr_search: for offset in 0..1000 {
+                let addrs = file_info.lines.get(&((naive_line_num + offset) as u32));
+                if let Some(addrs) = addrs {
+                    if addrs.len() > 0 {
+                        event_addr = Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
+                        final_offset = offset;
+                        break 'addr_search;
+                    }
+                }
+            }
+            let Some(event_addr) = event_addr else {
+                return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", node.FQN));
+            };
+            node.address = event_addr;
+            node.location.line_num = (final_offset + naive_line_num) as u32;
         }
-        self.nodes = nodes;
+        self.nodes.clear();
+        for (_, node) in nodes {
+            self.nodes.insert(node.address, node);
+        }
         Ok(())
     }
-    pub fn update_raw_modules(&mut self,modules: HashMap<String,GraphModule>)->anyhow::Result<()>{
+    pub fn update_raw_modules(
+        &mut self,
+        modules: HashMap<String, GraphModule>,
+    ) -> anyhow::Result<()> {
         self.is_prepared = false;
         self.modules = modules;
         Ok(())
@@ -103,11 +146,8 @@ impl GraphBuilder {
     // TODO : This code is also very fragile and /requires/ tests
     //
     pub fn prepare(&mut self, bin_interface: &mut BinaryInterface) -> anyhow::Result<()> {
-        log::warn!("a");
-
         // bin_interface.pin_mut().restart_from_event(0);
 
-        log::warn!("a2");
         let cont = GdbContAction {
             type_: GdbActionType::ACTION_CONTINUE,
             target: bin_interface.get_current_thread(),
@@ -121,11 +161,16 @@ impl GraphBuilder {
 
         for node in self.nodes.values() {
             dbg!(&node);
+            if node.address == 0 {
+                anyhow::bail!(
+                    "Node address for {} is 0. This should never happen.",
+                    &node.FQN
+                );
+            }
             bin_interface.pin_mut().set_sw_breakpoint(node.address, 1);
         }
         dbg!(self.nodes.len());
 
-        log::warn!("a3");
         let mut opened_frame_time: i64 = bin_interface.current_frame_time();
         self.address_recorder
             .reset_ft_for_writing(opened_frame_time as usize);
@@ -162,7 +207,6 @@ impl GraphBuilder {
             signal = bin_interface.pin_mut().continue_forward(cont).unwrap();
         }
 
-        log::warn!("a4");
         self.address_recorder.finished_writing_ft();
 
         // Record locations in test.log, run synoptic, then read the output file
@@ -183,7 +227,6 @@ impl GraphBuilder {
                 writeln!(output, "{}", name)?;
             }
             let out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
-            dbg!(out);
             let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base))
                 .unwrap_or("graph [\n]".into());
             let root = GMLObject::from_str(&gml_data)?;
@@ -192,23 +235,21 @@ impl GraphBuilder {
             self.build_synoptic_nodes(&graph);
             self.gml_graph = Some(graph);
         }
-        log::warn!("a5");
         // Remove all set swbreakpoints to not alter internal state of machine
         for node in self.nodes.values() {
-            bin_interface.pin_mut().remove_sw_breakpoint(node.address, 1);
+            bin_interface
+                .pin_mut()
+                .remove_sw_breakpoint(node.address, 1);
         }
-
-        log::warn!("a6");
 
         self.is_prepared = true;
         Ok(())
     }
-    // TODO ensure this fits into the graph rather than just grabbing the 
+    // TODO ensure this fits into the graph rather than just grabbing the
     // address
-    pub fn get_addr_occurrences(&self, synoptic_id: usize) -> Vec<TimeStamp>{
+    pub fn get_addr_occurrences(&self, synoptic_id: usize) -> Vec<TimeStamp> {
         let addr = &self.synoptic_nodes[&synoptic_id].address;
         self.address_recorder.get_addr_occurrences(*addr)
-
     }
     fn build_synoptic_nodes(&mut self, gml_graph: &gml_parser::Graph) {
         'outer: for gml_node in &gml_graph.nodes {
@@ -220,6 +261,53 @@ impl GraphBuilder {
                 }
             }
         }
+    }
+    fn get_synoptic_node_groups(
+        module_nodes: &Vec<gml_parser::Node>,
+        edges: &Vec<gml_parser::Edge>,
+    ) {
+        let mut groups: Vec<Vec<gml_parser::Node>> = Vec::new();
+        let mut outgoing_pairs = Vec::new(); // Node -> id
+        let mut incoming_pairs = Vec::new(); // id -> Node
+        'node_loop: for node in module_nodes {
+            let mut incoming_pair = None;
+            let mut outgoing_pair = None;
+
+            'outgoing_search: for edge in edges {
+                if edge.source == node.id {
+                    if outgoing_pair.is_some() {
+                        outgoing_pair = None;
+                        break 'outgoing_search;
+                    }
+                    outgoing_pair = Some((node.clone(), edge.target));
+                }
+            }
+            'incoming_search: for edge in edges {
+                if edge.target == node.id {
+                    if incoming_pair.is_some() {
+                        incoming_pair = None;
+                        break 'incoming_search;
+                    }
+                    incoming_pair = Some((edge.source, node.clone()));
+                }
+            }
+            if let Some(outgoing_pair) = outgoing_pair {
+                outgoing_pairs.push(outgoing_pair)
+            }
+            if let Some(incoming_pair) = incoming_pair {
+                incoming_pairs.push(incoming_pair)
+            }
+        }
+        let mut strict_pairs = Vec::new();
+        for outgoing_pair in &outgoing_pairs {
+            for incoming_pair in &incoming_pairs {
+                if outgoing_pair.0.id == incoming_pair.0 && outgoing_pair.1 == incoming_pair.1.id {
+                    strict_pairs.push((&outgoing_pair.0, &incoming_pair.1));
+                }
+                
+            }
+        }
+
     }
     fn create_node_recursive(
         &self,
@@ -326,4 +414,3 @@ impl GraphBuilder {
         Ok(String::from_utf8(output_bytes)?)
     }
 }
-

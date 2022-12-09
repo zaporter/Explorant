@@ -62,6 +62,7 @@ pub_struct!(AllSourceFilesResponse{
 pub_struct!(UpdateRawNodesAndModulesRequest{
     nodes : HashMap<usize,GraphNode>,
     modules : HashMap<String,GraphModule>,
+    //require_rerun: bool,
 });
 
 pub_struct!(UpdateRawNodesAndModulesResponse{

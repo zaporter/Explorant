@@ -27,6 +27,8 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
             module_attributes: HashMap::new(),
         },
     );
+
+    let mut fake_addr = 0;
     for (file_name, file_info) in &erebor.files {
         log::info!("reading file {} ", file_name.to_string_lossy());
         let file = File::open(file_name);
@@ -63,39 +65,24 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                     }
                 }
                 Annotation::Event { name } => {
-                    let mut event_addr = None;
-                    let mut final_offset = 0;
-                    'addr_search: for offset in 1..1000 {
-                        let addrs = file_info.lines.get(&((line_num + offset) as u32));
-                        if let Some(addrs) = addrs {
-                            if addrs.len() > 0 {
-                                event_addr =
-                                    Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
-                                final_offset = offset;
-                                break 'addr_search;
-                            }
-                        }
-                    }
-                    let Some(event_addr) = event_addr else {
-                        return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
-                    };
+                    fake_addr += 1;
                     log::info!("Registered event {}, ", name);
 
                     let mut t_name = name.clone();
                     let mut mn_iter = t_name.split("::");
-                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a module"))?;
-                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a node"))?;
+                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a module"))?;
+                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a node"))?;
                     nodes.insert(
-                        event_addr,
+                        fake_addr, // WILL BE REPLACED BY graph_builder
                         GraphNode {
-                            FQN: name,
-                            address: event_addr,
+                            FQN: "".into(), // WILL BE REPLACED BY graph_builder
+                            address: 0, // WILL BE REPLACED BY graph_builder
                             module: m_name.into(),
                             name: n_name.into(),
-                            node_type: "flow".into(),
+                            node_type: "Event".into(),
                             location: LineLocation {
                                 file: file_name.clone(),
-                                line_num: (final_offset + line_num) as u32,
+                                line_num: line_num as u32, // WILL BE REPLACED BY graph_builder
                                 column_num: 0,
                             },
                             labeled_transisitons: Vec::new(),
@@ -104,38 +91,24 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                     );
                 }
                 Annotation::Flow { name } => {
-                    let mut event_addr = None;
-                    let mut final_offset = 0;
-                    'addr_search: for offset in 1..1000 {
-                        let addrs = file_info.lines.get(&((line_num + offset) as u32));
-                        if let Some(addrs) = addrs {
-                            if addrs.len() > 0 {
-                                event_addr =
-                                    Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
-                                final_offset = offset;
-                                break 'addr_search;
-                            }
-                        }
-                    }
-                    let Some(event_addr) = event_addr else {
-                        return Err(anyhow::anyhow!("Unable to find an address for the {} event annotation", name));
-                    };
+                    fake_addr += 1;
                     log::info!("Registered event {}, ", name);
+
                     let mut t_name = name.clone();
                     let mut mn_iter = t_name.split("::");
-                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a module"))?;
-                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Event {name} does not have a node"))?;
+                    let m_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a module"))?;
+                    let n_name = mn_iter.next().ok_or(anyhow::anyhow!("Flow {name} does not have a node"))?;
                     nodes.insert(
-                        event_addr,
+                        fake_addr, // WILL BE REPLACED BY graph_builder
                         GraphNode {
-                            FQN: name.clone(),
-                            address: event_addr,
+                            FQN: "".into(), // WILL BE REPLACED BY graph_builder
+                            address: 0, // WILL BE REPLACED BY graph_builder
                             module: m_name.into(),
                             name: n_name.into(),
-                            node_type: "event".into(),
+                            node_type: "Flow".into(),
                             location: LineLocation {
                                 file: file_name.clone(),
-                                line_num: (final_offset + line_num) as u32,
+                                line_num: line_num as u32, // WILL BE REPLACED BY graph_builder
                                 column_num: 0,
                             },
                             labeled_transisitons: Vec::new(),
@@ -146,11 +119,11 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
             }
         }
     }
-    for mut node in &mut nodes.values_mut() {
-        node.FQN = name_to_fqn(&node.FQN, &modules)?;
-    }
-    graph_builder.nodes = nodes;
-    graph_builder.modules = modules;
+    // for mut node in &mut nodes.values_mut() {
+    //     node.FQN = name_to_fqn(&node.FQN, &modules)?;
+    // }
+    graph_builder.update_raw_modules(modules);
+    graph_builder.update_raw_nodes(nodes, &erebor);
     Ok(())
 }
 // TODO: prevent infinite recursion with a module having itself

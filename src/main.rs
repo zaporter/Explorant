@@ -246,13 +246,14 @@ async fn update_raw_nodes_and_modules(
     bin_interface.set_pass_signals(vec![
         0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
     ]);
-    // let mut bin_interface = data.get_ref().traces[0].bin_interface.lock().unwrap();
+    let settings: &mut Settings = &mut data.get_ref().settings.lock().unwrap();
+    let erebor = data.get_ref().traces[0].dwarf_data.lock().unwrap();
     let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
-    log::error!("UPDATE_2");
+    settings.selected_node_id = None;
     graph_builder.update_raw_modules(req.modules).unwrap();
-    graph_builder.update_raw_nodes(req.nodes).unwrap();
-    log::error!("UPDATE_3");
+    graph_builder.update_raw_nodes(req.nodes, &erebor).unwrap();
     graph_builder.prepare(&mut bin_interface);
+    
 
     let resp = UpdateRawNodesAndModulesResponse {
     };
