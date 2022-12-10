@@ -35,17 +35,21 @@ const NodeEditor = (props) => {
     let addr = nodesData.nodes[nid].address;
     let update_raw_fn = (raw_n_data) => {
       raw_n_data.nodes[addr].name=name;
-      console.log(raw_n_data.nodes[addr].module);
-      console.log(selectedModule);
       raw_n_data.nodes[addr].module=selectedModule;
+      raw_n_data.nodes[addr].node_type=type;
+      raw_n_data.nodes[addr].location.line_num=lineLocation;
       return raw_n_data;
     } 
-    
     props.updateNodeData(update_raw_fn);
   }
 
   const handleDeleteNode = () => {
-    props.onDelete(name,type,lineLocation);
+    let addr = nodesData.nodes[nid].address;
+    let update_raw_fn = (raw_n_data) => {
+      delete raw_n_data.nodes[addr];
+      return raw_n_data;
+    } 
+    props.updateNodeData(update_raw_fn);
     // delete node logic
   }
 

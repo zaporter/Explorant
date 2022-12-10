@@ -33,8 +33,8 @@ function App() {
       .then(resp => resp.json())
       .then(dta => update_raw_fn(dta))
       .then(dta => callRemote(dta,'update_raw_nodes_and_modules')
-        .then(_=>{})
         .then(callRemote({},'node_data').then(resp=>resp.json()).then(resp=>setNodeData(resp)))
+        .then(_=>updateCurrentNode(null))
       )
   }
 
@@ -45,6 +45,7 @@ function App() {
       {
         (generalInfo && nodesData) ? (<SplitLayout>
           <SrcViewer
+            key={nodesData}
             nodesData={nodesData}
             currentFilePath={currentFilePath}
             setCurrentFilePath={setCurrentFilePath}
@@ -52,6 +53,7 @@ function App() {
             updateNodeData={updateNodeData}
             setCurrentFileLineNum={setCurrentFileLineNum} />
           <GraphViewer
+            key={nodesData}
             nodesData={nodesData}
             setCurrentFilePath={setCurrentFilePath}
             setCurrentFileLineNum={setCurrentFileLineNum}

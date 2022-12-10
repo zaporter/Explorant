@@ -5,7 +5,8 @@ import {Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 //import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import StringCompletionInput from './StringCompletionInput.js';
-import AddNodeModal from './AddNodeModal.js';
+import TextModal from './TextModal.js';
+import NodeEditor from './NodeEditor.js'
 const SrcViewer = (props) => {
   let nodesData = props.nodesData;
   
@@ -119,7 +120,9 @@ const SrcViewer = (props) => {
     </div>
     </div>
 
-    {showAddNodeModal && <AddNodeModal onClose={()=>{setShowAddNodeModal(false)}} child_props={{"nodesData":props.nodesData}}/>}
+    {showAddNodeModal && <TextModal onClose={()=>{setShowAddNodeModal(false)}}>
+        <NodeEditor mode={"add"} nodesData={props.nodesData}/>
+      </TextModal>}
     </div>
   );
 }

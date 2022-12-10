@@ -5,7 +5,7 @@ const TextModal = (props) => {
     <div className="text-modal-container">
       <div className="text-modal-background" onClick={props.onClose}></div>
       <div className="text-modal-content">
-        <p className="text-modal-text">{props.text}</p>
+        {props.children}
         <button className="text-modal-close" onClick={props.onClose}>Close</button>
       </div>
     </div>

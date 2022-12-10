@@ -59,6 +59,11 @@ const GraphViewer = (props) => {
   }
   const interactive = () => {
     console.log("interactive");
+    let clusters = d3.selectAll('.cluster');
+    clusters
+      .on("click", function() {
+        console.log(this);
+      })
     let nodes = d3.selectAll('.node,.edge');
     nodes
       .on("click", function() {
@@ -82,13 +87,6 @@ const GraphViewer = (props) => {
               props.setCurrentFilePath(respective.location.file)
               props.setCurrentFileLineNum(respective.location.line_num)
           }))
-        // .then(_=>setNodeName(respective.FQN))
-          // .then(_ => props.setCurrentFilePath(respective.location.file))
-          // .then(_ => props.setCurrentFileLineNum(respective.location.line_num));
-        // callRemote({}, "get_settings")
-        //   .then(response=>response.json())
-        //   .then(old_settings=>console.log(old_settings))
-        // setDotSrc({version:1,dot:`
       });
   }
   useEffect(() => {

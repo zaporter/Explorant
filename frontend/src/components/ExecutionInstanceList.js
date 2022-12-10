@@ -28,14 +28,20 @@ const ExecutionInstanceList = (props) => {
   const handleClick = (item) => {
     callRemote({ "start_time": item }, "create_gdb_server")
       .then(response => response.json())
-      .then(response => setModalText(`To go to this spot in the trace, run: ${response.value}`));
+      .then(response => setModalText(response.value));
   }
 
   return (
     <div className="box-wrapper">
       <h3>{"Execution Instances:"}</h3>
       <p>{"Click one of the instances below to start a gdb server at that location:"}</p>
-      {modalText && <TextModal text={modalText} onClose={()=>setModalText(null)}/>}
+      {modalText && <TextModal onClose={()=>setModalText(null)}>
+        <div>
+          <p className='text-modal-text'>{"To go to this location in the trace, execute:"}</p>
+          <p className='text-modal-text'>{modalText}</p>
+
+        </div>
+      </TextModal>}
 
 
       <table className="execution-instance-list">

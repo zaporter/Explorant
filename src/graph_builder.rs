@@ -262,11 +262,11 @@ impl GraphBuilder {
             }
         }
     }
-    fn get_synoptic_node_groups(
-        module_nodes: &Vec<gml_parser::Node>,
+    fn get_synoptic_node_groups<'a>(
+        module_nodes: &'a Vec<&'a gml_parser::Node>,
         edges: &Vec<gml_parser::Edge>,
-    ) {
-        let mut groups: Vec<Vec<gml_parser::Node>> = Vec::new();
+    ) -> Vec<Vec<&'a gml_parser::Node>> {
+        let mut groups: Vec<Vec<&gml_parser::Node>> = Vec::new();
         let mut outgoing_pairs = Vec::new(); // Node -> id
         let mut incoming_pairs = Vec::new(); // id -> Node
         'node_loop: for node in module_nodes {
@@ -279,7 +279,7 @@ impl GraphBuilder {
                         outgoing_pair = None;
                         break 'outgoing_search;
                     }
-                    outgoing_pair = Some((node.clone(), edge.target));
+                    outgoing_pair = Some((node, edge.target));
                 }
             }
             'incoming_search: for edge in edges {
@@ -288,7 +288,7 @@ impl GraphBuilder {
                         incoming_pair = None;
                         break 'incoming_search;
                     }
-                    incoming_pair = Some((edge.source, node.clone()));
+                    incoming_pair = Some((edge.source, node));
                 }
             }
             if let Some(outgoing_pair) = outgoing_pair {
@@ -304,47 +304,189 @@ impl GraphBuilder {
                 if outgoing_pair.0.id == incoming_pair.0 && outgoing_pair.1 == incoming_pair.1.id {
                     strict_pairs.push((&outgoing_pair.0, &incoming_pair.1));
                 }
-                
             }
         }
-
+        'pair: for strict_pair in strict_pairs {
+            let source = strict_pair.0;
+            let dest = strict_pair.1;
+            for mut group in &mut groups {
+                if group.contains(&source) {
+                    if !group.contains(&dest) {
+                        group.push(dest);
+                    }
+                    continue 'pair;
+                } else if group.contains(&dest) {
+                    if !group.contains(&source) {
+                        group.push(source);
+                    }
+                    continue 'pair;
+                }
+            }
+            // Not in any group, create a new group
+            groups.push(vec![source, dest]);
+        }
+        // Add all of the solo nodes to their own
+        // single groups
+        'node: for node in module_nodes {
+            for group in &groups {
+                if group.contains(&node) {
+                    continue 'node;
+                }
+            }
+            groups.push(vec![node]);
+        }
+        groups
     }
     fn create_node_recursive(
         &self,
         parent_name: Option<&str>,
         parent_scope: &mut Scope,
         nodes: &Vec<gml_parser::Node>,
+        edges: &Vec<gml_parser::Edge>,
         settings: &Settings,
+        collapsed_module_map: &Vec<(Vec<i64>, i64)>,
     ) {
         if parent_name.is_some() {
             parent_scope.set_label(parent_name.unwrap());
         }
+        let mut module_nodes = Vec::new();
         for node in nodes {
             let label = &node.label.clone().unwrap();
             if label == "INITIAL" || label == "TERMINAL" {
+                if parent_name == None {
+                    parent_scope
+                        .node_named(format!("N{}", node.id))
+                        .set_label(&label);
+                }
                 continue;
             }
             let (p_name, s_name) = Self::get_direct_module_parent(&label);
             if p_name == parent_name {
+                module_nodes.push(node);
+                // Check if node is collapsed and add the collapsed node
+                for (collapsed_group, new_id) in collapsed_module_map {
+                    if collapsed_group.contains(&node.id) {
+                        parent_scope
+                            .node_named(format!("N{}", new_id))
+                            .set_label("...");
+                        // Do not continue adding nodes or children
+                        return;
+                    }
+                }
+            }
+        }
+        let groups = Self::get_synoptic_node_groups(&module_nodes, edges);
+        for group in groups {
+            let group_len = group.len();
+
+            let mut cluster = if group_len == 1 {
+                parent_scope.subgraph()
+            } else {
+                parent_scope.cluster()
+            };
+            cluster.set_label("");
+            for node in group {
+                let label = &node.label.clone().unwrap();
                 let is_selected = Some(node.id as usize) == settings.selected_node_id;
                 let color: dot_writer::Color = if is_selected {
                     dot_writer::Color::Red
                 } else {
                     dot_writer::Color::Black
                 };
-                parent_scope
+                let mut shape = dot_writer::Shape::Rectangle;
+                let mut name = None;
+                'inner: for real_node in self.nodes.values() {
+                    if real_node.FQN == *label {
+                        if real_node.node_type == "Flow" {
+                            shape = dot_writer::Shape::Mdiamond;
+                        }
+                        name = Some(format!("{}", &real_node.name));
+                        break 'inner;
+                    }
+                }
+                cluster
                     .node_named(format!("N{}", node.id))
                     .set_color(color)
-                    .set("root", "true", false)
-                    .set_label(&label);
+                    .set_shape(shape)
+                    .set_label(&name.unwrap());
             }
         }
+
         for (mod_name, module) in &self.modules {
             if module.parent.as_deref() == parent_name {
-                let mut child_scope = parent_scope.cluster();
-                self.create_node_recursive(Some(&mod_name), &mut child_scope, nodes, settings);
+                let mut child_scope = if parent_name.is_none() {
+                    parent_scope.subgraph()
+                } else {
+                    parent_scope.cluster()
+                };
+                self.create_node_recursive(
+                    Some(&mod_name),
+                    &mut child_scope,
+                    nodes,
+                    edges,
+                    settings,
+                    collapsed_module_map,
+                );
             }
         }
+    }
+    fn get_collapsed_children_recursive(
+        &self,
+        mut is_collapsed: bool,
+        current_module_str: &str,
+    ) -> Vec<(Vec<i64>, i64)> {
+        let mut collapsed_module_ignore: (Vec<i64>, i64) = (Vec::new(),0);
+        if !is_collapsed {
+            let this_module = self.modules.get(current_module_str).unwrap();
+            if this_module.module_attributes.get("collapsed") == Some(&"true".to_string()) {
+                is_collapsed = true;
+            }
+        }
+        // Loop through all of the nodes... again
+        // I need to pick better data structures
+        if is_collapsed {
+            for (id, node) in &self.synoptic_nodes {
+                if node.module == current_module_str {
+                    collapsed_module_ignore.0.push(*id as i64);
+                    if collapsed_module_ignore.1 == 0 {
+                        collapsed_module_ignore.1 = *id as i64;
+                    }
+                }
+            }
+        }
+
+        let mut to_ret = Vec::new();
+        if is_collapsed {
+            to_ret.push(collapsed_module_ignore);
+        }
+        // find children
+        for (mod_name, module) in &self.modules {
+            if module.parent.as_deref() == Some(current_module_str) {
+                // if this is a collapsed module, we will only be returning 1
+                // giant vec
+                if is_collapsed {
+                    let child_children = self.get_collapsed_children_recursive(
+                        true,
+                        mod_name,
+                    );
+                    for elem in &child_children[0].0 {
+                        to_ret[0].0.push(*elem);
+                    }
+                }
+                // if this is not a collapsed module, then each of the children who return vectors
+                // need to have their vectors flat-inserted into this one
+                else {
+                    let child_children = self.get_collapsed_children_recursive(
+                        false,
+                        mod_name,
+                    );
+                    for list in child_children {
+                        to_ret.push(list);
+                    }
+                }
+            }
+        }
+        to_ret
     }
     fn get_direct_module_parent(name: &str) -> (Option<&str>, &str) {
         let elems: Vec<&str> = name.split("::").collect();
@@ -367,32 +509,26 @@ impl GraphBuilder {
             let mut writer = DotWriter::from(&mut output_bytes);
             writer.set_pretty_print(false);
             let mut digraph = writer.digraph();
+            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> = Vec::new();
 
-            self.create_node_recursive(None, &mut digraph, &gml_graph.nodes, settings);
-            // let mut cluster_map : HashMap<Option<String>, Rc<RefCell<Scope>>>  = HashMap::new();
-            // cluster_map.insert(None, Rc::new(RefCell::new(digraph)));
-            // let mut to_resolve = VecDeque::new();
-            // to_resolve.push_back(None);
-            // while let Some(resolving) = to_resolve.pop_front(){
-            //         let parent_scope = cluster_map.get(&resolving).unwrap();
-            //     for (key, module) in &self.modules {
-            //         if module.parent == resolving {
-            //             let to_insert = Some(key.clone());
-            //             to_resolve.push_back(to_insert.clone());
+            self.create_node_recursive(
+                None,
+                &mut digraph,
+                &gml_graph.nodes,
+                &gml_graph.edges,
+                settings,
+                &collapsed_module_map,
+            );
+            'edge: for edge in &gml_graph.edges {
+                // for node in &gml_graph.nodes{
+                //     if node.id == edge.source && node.label == Some("INITIAL".into()) {
+                //         continue 'edge;
+                //     }
+                //     if node.id == edge.target && node.label == Some("TERMINAL".into()) {
+                //         continue 'edge;
+                //     }
+                // }
 
-            //             let inner_scope = parent_scope.borrow_mut().cluster();
-            //             cluster_map.insert(to_insert.clone(), Rc::new(RefCell::new(inner_scope)));
-            //         }
-
-            //     }
-
-            // }
-            // for node in gml_graph.nodes {
-            //     digraph.node_named(format!("N{}",node.id))
-            //         .set_label(&node.label.unwrap_or("[unnamed]".into()))
-            //         .set_color(dot_writer::Color::Red);
-            // }
-            for edge in &gml_graph.edges {
                 let mut attribs = digraph
                     .edge(format!("N{}", edge.source), format!("N{}", edge.target))
                     .attributes();
@@ -401,14 +537,16 @@ impl GraphBuilder {
                     // dbg!(&val);
                     let val = val.parse::<f32>();
                     if let Ok(val) = val {
-                        attribs.set_pen_width(val * 6.);
+                        attribs.set_pen_width(val * 5. + 1.5);
                     }
                 }
-                // if Some(edge.source as usize) == settings.selected_node_id {
-                //     attribs.set_label(&edge.label.clone().unwrap_or("".into()));
-                // } else if Some(edge.target as usize) == settings.selected_node_id {
-                //     attribs.set_label(&edge.label.clone().unwrap_or("".into()));
-                // }
+                if Some(edge.source as usize) == settings.selected_node_id {
+                    attribs.set_color(dot_writer::Color::Red);
+                    // attribs.set_rank(dot_writer::Rank::Max);
+                } else if Some(edge.target as usize) == settings.selected_node_id {
+                    attribs.set_color(dot_writer::Color::Blue);
+                    // attribs.set_rank(dot_writer::Rank::Max);
+                }
             }
         }
         Ok(String::from_utf8(output_bytes)?)

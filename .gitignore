@@ -4,3 +4,4 @@ test-executables/build
 
 synoptic/shared/out.json
 synoptic/shared/out.gml
+synoptic/shared/test.log

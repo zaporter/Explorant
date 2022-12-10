@@ -82,7 +82,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                             node_type: "Event".into(),
                             location: LineLocation {
                                 file: file_name.clone(),
-                                line_num: line_num as u32, // WILL BE REPLACED BY graph_builder
+                                line_num: 1+line_num as u32, // WILL BE REPLACED BY graph_builder
                                 column_num: 0,
                             },
                             labeled_transisitons: Vec::new(),
