@@ -50,12 +50,12 @@ const GraphViewer = (props) => {
   //   }).renderDot(dotSrc);
   // }, []);
   const update_settings_and_redraw = (new_settings) => {
-    callRemote({ "settings": new_settings }, "set_settings")
+    return callRemote({ "settings": new_settings }, "set_settings")
       .then(
         callRemote({}, "current_graph")
           .then(response => response.json())
           .then(data => setDotSrc(data))
-      );
+      )
   }
   const interactive = () => {
     console.log("interactive");
@@ -80,13 +80,13 @@ const GraphViewer = (props) => {
         callRemote({}, "get_settings")
           .then(response => response.json())
           .then(old_settings => { old_settings.selected_node_id = key; return old_settings })
-          .then(new_settings => update_settings_and_redraw(new_settings))
+          .then(new_settings => update_settings_and_redraw(new_settings)
           // .then(_ => updateCurrentNode_int(key))
           .then(_ => unstable_batchedUpdates(()=>{
               updateCurrentNode_int(key)
               props.setCurrentFilePath(respective.location.file)
               props.setCurrentFileLineNum(respective.location.line_num)
-          }))
+          })))
       });
   }
   useEffect(() => {
