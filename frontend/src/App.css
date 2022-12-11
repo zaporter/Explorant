@@ -3,8 +3,13 @@
   /* text-align: center; */
   background-color: #2c3333;
 }
+
+p {
+}
+
 body {
   /* text-align: center; */
+  font-family: Sans-Serif;
   background-color: #2c3333;
 }
 
@@ -27,6 +32,9 @@ h1 {
 }
 h3 {
   color: #7fb235;
+}
+.tutorial-div {
+  display: inline-flex;
 }
 
 .App-header {
@@ -164,6 +172,7 @@ right: 0;
 display: flex;
 justify-content: center;
 align-items: center;
+z-index:1000;
 }
 
 .text-modal-background {

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useRemoteResource } from '../util.js';
 import { callRemote } from '../util.js';
 import TextModal from './TextModal.js';
+import {Tutorial, ExecutionExplorerHelp} from '../tutorials.js';
 
 const ExecutionInstanceList = (props) => {
   // Declare a state variable to store the currently hovered item
@@ -33,7 +34,10 @@ const ExecutionInstanceList = (props) => {
 
   return (
     <div className="box-wrapper">
-      <h3>{"Execution Instances:"}</h3>
+      <p className="tutorial-div">
+        <h3>{"Execution Explorer"}</h3>
+        <Tutorial><ExecutionExplorerHelp/></Tutorial>
+      </p>
       <p>{"Click one of the instances below to start a gdb server at that location:"}</p>
       {modalText && <TextModal onClose={()=>setModalText(null)}>
         <div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import StringCompletionInput from './StringCompletionInput.js';
+import {Tutorial, NodeEditorHelp} from '../tutorials.js';
 
 const NodeEditor = (props) => {
   let nodesData = props.nodesData;
@@ -55,9 +56,13 @@ const NodeEditor = (props) => {
 
   return (
     <div className="node-editor">
+
+    <p className="tutorial-div">
       { props.mode == 'add' ? (
         <h3>{"Add Node:"}</h3>) : (<h3> {"Edit Node:"}</h3>)
       }
+      <Tutorial><NodeEditorHelp/></Tutorial>
+    </p>
       <label className="node-editor__label">
         Name:
         <input className="node-editor__input" type="text" value={name} onChange={handleNameChange} />

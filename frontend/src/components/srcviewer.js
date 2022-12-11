@@ -7,6 +7,7 @@ import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import StringCompletionInput from './StringCompletionInput.js';
 import TextModal from './TextModal.js';
 import NodeEditor from './NodeEditor.js'
+import {Tutorial, SrcReaderHelp} from '../tutorials.js';
 const SrcViewer = (props) => {
   let nodesData = props.nodesData;
   
@@ -80,7 +81,11 @@ const SrcViewer = (props) => {
       )}
 
   <div className="src-viewer">
-    <h3>{"Source Viewer"}</h3>
+    <p className="tutorial-div">
+      <h3>{"Source Viewer"}</h3>
+      <Tutorial><SrcReaderHelp/></Tutorial>
+    </p>
+    
     <p>{`Viewing ${props.currentFilePath}`}</p>
     <StringCompletionInput 
       key={props.currentFilePath}

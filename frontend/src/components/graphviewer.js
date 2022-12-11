@@ -5,6 +5,7 @@ import { graphviz } from 'd3-graphviz';
 import { useRemoteResource } from '../util.js';
 import { callRemote } from '../util.js';
 import * as d3 from "d3";
+import {Tutorial, GraphViewerHelp} from '../tutorials.js';
 
 let counter = 0;
 const getId = () => `graphviz${counter++}`;
@@ -104,7 +105,10 @@ const GraphViewer = (props) => {
   return (
     <div className="box-wrapper">
       <div className='graph-outer' id="sizeDiv">
-        <h3>{"GraphViz Viewer"}</h3>
+        <p className="tutorial-div">
+          <h3>{"Graph Viewer"}</h3>
+          <Tutorial><GraphViewerHelp/></Tutorial>
+        </p>
         <div className="graph-viewer" id={id} />
       </div>
     </div>
