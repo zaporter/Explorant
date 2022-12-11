@@ -85,7 +85,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                                 line_num: 1+line_num as u32, // WILL BE REPLACED BY graph_builder
                                 column_num: 0,
                             },
-                            labeled_transisitons: Vec::new(),
+                            labeled_transitions: Vec::new(),
                             node_attributes: HashMap::new(),
                         },
                     );
@@ -111,7 +111,7 @@ pub fn parse_annotations(erebor: &Erebor, graph_builder: &mut GraphBuilder) -> a
                                 line_num: line_num as u32, // WILL BE REPLACED BY graph_builder
                                 column_num: 0,
                             },
-                            labeled_transisitons: Vec::new(),
+                            labeled_transitions: Vec::new(),
                             node_attributes: HashMap::new(),
                         },
                     );

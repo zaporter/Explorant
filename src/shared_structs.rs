@@ -104,7 +104,7 @@ pub_struct!(GraphNode {
     address:usize,
     node_type: String,
     location: LineLocation,
-    labeled_transisitons: Vec<LabeledTransition>,
+    labeled_transitions: Vec<LabeledTransition>,
     node_attributes: HashMap<String,String>,
 });
 pub_struct!(LabeledTransition {

@@ -342,6 +342,7 @@ impl GraphBuilder {
         parent_name: Option<&str>,
         parent_scope: &mut Scope,
         nodes: &Vec<gml_parser::Node>,
+        // nodes: &Vec<GraphNode>,
         edges: &Vec<gml_parser::Edge>,
         settings: &Settings,
         collapsed_module_map: &Vec<(Vec<i64>, i64)>,
@@ -509,7 +510,7 @@ impl GraphBuilder {
             let mut writer = DotWriter::from(&mut output_bytes);
             writer.set_pretty_print(false);
             let mut digraph = writer.digraph();
-            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> = Vec::new();
+            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> = self.get_collapsed_children_recursive(false, "");
 
             self.create_node_recursive(
                 None,
@@ -528,9 +529,28 @@ impl GraphBuilder {
                 //         continue 'edge;
                 //     }
                 // }
+                
+                let mut source = edge.source;
+                let mut target = edge.target;
+                
+                for collapsed_module in &collapsed_module_map {
+                    if collapsed_module.0.contains(&source) {
+                        source = collapsed_module.1;
+                    }
+                    break;
+                }
+                for collapsed_module in &collapsed_module_map {
+                    if collapsed_module.0.contains(&target) {
+                        target = collapsed_module.1;
+                    }
+                    break;
+                }
+                if source == target {
+                    continue 'edge;
+                }
 
                 let mut attribs = digraph
-                    .edge(format!("N{}", edge.source), format!("N{}", edge.target))
+                    .edge(format!("N{}", source), format!("N{}", target))
                     .attributes();
                 if let Some(label) = edge.label.clone() {
                     let val = &label[3..];
@@ -540,10 +560,10 @@ impl GraphBuilder {
                         attribs.set_pen_width(val * 5. + 1.5);
                     }
                 }
-                if Some(edge.source as usize) == settings.selected_node_id {
+                if Some(source as usize) == settings.selected_node_id {
                     attribs.set_color(dot_writer::Color::Red);
                     // attribs.set_rank(dot_writer::Rank::Max);
-                } else if Some(edge.target as usize) == settings.selected_node_id {
+                } else if Some(target as usize) == settings.selected_node_id {
                     attribs.set_color(dot_writer::Color::Blue);
                     // attribs.set_rank(dot_writer::Rank::Max);
                 }

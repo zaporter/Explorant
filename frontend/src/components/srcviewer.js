@@ -11,10 +11,12 @@ import {Tutorial, SrcReaderHelp} from '../tutorials.js';
 const SrcViewer = (props) => {
   let nodesData = props.nodesData;
   
+  // This had better be an even number
+  const numLines = 40;
 
   let currentFile = props.currentFilePath ? {file: props.currentFilePath,line_num:props.currentFileLineNum} : {file:"[none selected]", line_num:0};
-  const [centeredLine, setCenteredLine] = useState(props.currentFileLineNum);
-  useEffect(()=>{setCenteredLine(props.currentFileLineNum)},[props.currentFileLineNum]);
+  const [centeredLine, setCenteredLine] = useState(props.currentFileLineNum-(numLines/2));
+  useEffect(()=>{setCenteredLine(props.currentFileLineNum-(numLines/2))},[props.currentFileLineNum]);
 
 
   const [allFiles, _setAllFiles] = useRemoteResource({files:["[none selected]"]},{}, 'source_files');
@@ -26,25 +28,31 @@ const SrcViewer = (props) => {
   const [data, _setData] = useRemoteResource({data:""}, {file_name: currentFile.file}, "source_file", [props.currentFilePath]);
   let lines = data.data.split("\n");
   
-  let minLine = Math.max(0,centeredLine-20);
-  let maxLine = Math.min(lines.length-1, centeredLine+20);
+  let minLine = Math.max(0,centeredLine);
+  let maxLine = Math.min(lines.length-1, centeredLine+numLines);
   let usedLines = lines.slice(minLine,maxLine);
+  while (usedLines.length < numLines) {
+    usedLines.push("");
+  }
   
   let toDisplay = usedLines.join("\n");
+  let numLinesInFile = lines.length;
 
   const handleScroll = (event) => {
     if (event.shiftKey) {
       event.preventDefault();
       console.log(event.deltaY);
-      let amount = Math.floor(event.deltaY / 30);
-      setCenteredLine(centeredLine+amount);
+      let amount = Math.floor(event.deltaY / 25);
+      let newLineNum = centeredLine+amount;
+      console.log(numLinesInFile);
+      setCenteredLine(Math.min(numLinesInFile-numLines,Math.max(0,newLineNum)));
     }
   };
   const dropdownRef = useRef();
   const [showDropdown, setShowDropdown] = useState(false);
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
-  var clickedLineNum = 0;
+  const [clickedLineNum, setClickedLineNum] = useState(0);
   const [showAddNodeModal, setShowAddNodeModal] = useState(false);
 
   const handleRightClick = (e) => {
@@ -81,12 +89,11 @@ const SrcViewer = (props) => {
       )}
 
   <div className="src-viewer">
-    <p className="tutorial-div">
+    <div className="tutorial-div">
       <h3>{"Source Viewer"}</h3>
       <Tutorial><SrcReaderHelp/></Tutorial>
-    </p>
+    </div>
     
-    <p>{`Viewing ${props.currentFilePath}`}</p>
     <StringCompletionInput 
       key={props.currentFilePath}
       default={props.currentFilePath}
@@ -99,6 +106,7 @@ const SrcViewer = (props) => {
     >
     <div ref={dropdownRef}>
       <SyntaxHighlighter 
+        customStyle={{overflow:"hidden"}}
         language="clike" 
         style={a11yDark} 
         startingLineNumber={minLine+1}
@@ -112,7 +120,7 @@ const SrcViewer = (props) => {
           //style.onClick = () => {console.log("test")};
           let onClick = () => {console.log("test")}
           let onContextMenu = (e) => {
-            clickedLineNum = lineNumber;
+            setClickedLineNum(lineNumber);
             handleRightClick(e);
           };
           return { style, onContextMenu};
@@ -126,7 +134,13 @@ const SrcViewer = (props) => {
     </div>
 
     {showAddNodeModal && <TextModal onClose={()=>{setShowAddNodeModal(false)}}>
-        <NodeEditor mode={"add"} nodesData={props.nodesData}/>
+        <NodeEditor 
+          mode={"add"}
+          name="name"
+          line={clickedLineNum}
+          file={currentFile.file}
+          updateNodeData={props.updateNodeData}
+          nodesData={props.nodesData}/>
       </TextModal>}
     </div>
   );

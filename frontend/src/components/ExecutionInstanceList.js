@@ -34,10 +34,10 @@ const ExecutionInstanceList = (props) => {
 
   return (
     <div className="box-wrapper">
-      <p className="tutorial-div">
+      <div className="tutorial-div">
         <h3>{"Execution Explorer"}</h3>
         <Tutorial><ExecutionExplorerHelp/></Tutorial>
-      </p>
+      </div>
       <p>{"Click one of the instances below to start a gdb server at that location:"}</p>
       {modalText && <TextModal onClose={()=>setModalText(null)}>
         <div>

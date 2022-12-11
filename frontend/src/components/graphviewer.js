@@ -5,7 +5,7 @@ import { graphviz } from 'd3-graphviz';
 import { useRemoteResource } from '../util.js';
 import { callRemote } from '../util.js';
 import * as d3 from "d3";
-import {Tutorial, GraphViewerHelp} from '../tutorials.js';
+import { Tutorial, GraphViewerHelp } from '../tutorials.js';
 
 let counter = 0;
 const getId = () => `graphviz${counter++}`;
@@ -34,7 +34,8 @@ const GraphViewer = (props) => {
   // }, []);
   const setCurrentFile = props.setCurrentFile;
   const id = useMemo(getId, []);
-  const [dotSrc, setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph',[props.nodesData]);
+  const [graphVer, setGraphVer] = React.useState(0);
+  const [dotSrc, setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph', [props.nodesData, graphVer]);
   console.log(props.nodesData);
 
   const defaultOptions = {
@@ -81,13 +82,18 @@ const GraphViewer = (props) => {
         callRemote({}, "get_settings")
           .then(response => response.json())
           .then(old_settings => { old_settings.selected_node_id = key; return old_settings })
-          .then(new_settings => update_settings_and_redraw(new_settings)
-          // .then(_ => updateCurrentNode_int(key))
-          .then(_ => unstable_batchedUpdates(()=>{
+          .then(new_settings => callRemote({ "settings": new_settings }, "set_settings")//.then(
+            // callRemote({}, "current_graph")
+            //   .then(response => response.json())
+            //   .then(data => setDotSrc(data))
+            .then(_ => unstable_batchedUpdates(() => {
               updateCurrentNode_int(key)
+              setGraphVer(graphVer + 1)
               props.setCurrentFilePath(respective.location.file)
               props.setCurrentFileLineNum(respective.location.line_num)
-          })))
+            })))
+        //) 
+        // .then(_ => updateCurrentNode_int(key))
       });
   }
   useEffect(() => {
@@ -105,10 +111,10 @@ const GraphViewer = (props) => {
   return (
     <div className="box-wrapper">
       <div className='graph-outer' id="sizeDiv">
-        <p className="tutorial-div">
+        <div className="tutorial-div">
           <h3>{"Graph Viewer"}</h3>
-          <Tutorial><GraphViewerHelp/></Tutorial>
-        </p>
+          <Tutorial><GraphViewerHelp /></Tutorial>
+        </div>
         <div className="graph-viewer" id={id} />
       </div>
     </div>

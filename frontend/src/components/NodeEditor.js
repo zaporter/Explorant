@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import StringCompletionInput from './StringCompletionInput.js';
-import {Tutorial, NodeEditorHelp} from '../tutorials.js';
+import { Tutorial, NodeEditorHelp } from '../tutorials.js';
 
 const NodeEditor = (props) => {
   let nodesData = props.nodesData;
   let nid = props.currentNodeId;
   const node = nodesData.nodes[nid];
   let validModules = Object.keys(nodesData.modules);
-  const [selectedModule, setSelectedModule] = useState(props.mode=="add" ? '' : node.module);
+  const [selectedModule, setSelectedModule] = useState(props.mode == "add" ? '' : node.module);
   const onUpdateModule = (new_val) => {
     setSelectedModule(new_val);
   }
-  const [name, setName] = useState(props.mode=='add'?props.name:node.name);
-  const [type, setType] = useState(props.mode=='add'?'Event':node.node_type);
-  const [lineLocation, setLineLocation] = useState(props.mode=='add'?props.line:node.location.line_num);
+  const [name, setName] = useState(props.mode == 'add' ? props.name : node.name);
+  const [type, setType] = useState(props.mode == 'add' ? 'Event' : node.node_type);
+  const [lineLocation, setLineLocation] = useState(props.mode == 'add' ? props.line : node.location.line_num);
 
   const handleNameChange = (event) => {
     setName(event.target.value);
@@ -28,19 +28,38 @@ const NodeEditor = (props) => {
   }
 
   const handleAddNode = () => {
-    props.onAdd(name, type, lineLocation);
-    // add node logic
+    let update_raw_fn = (raw_n_data) => {
+      console.log(raw_n_data);
+      let new_node = {
+        FQN: "",
+        address: 0,
+        name: name,
+        module: selectedModule,
+        node_type: type,
+        location: {
+          file: props.file,
+          line_num: lineLocation,
+          column_num: 0,
+        },
+        labeled_transitions: [],
+        node_attributes: {},
+      };
+      raw_n_data.nodes[0] = (new_node);
+      console.log(raw_n_data);
+      return raw_n_data;
+    }
+    props.updateNodeData(update_raw_fn);
   }
 
   const handleSaveNode = () => {
     let addr = nodesData.nodes[nid].address;
     let update_raw_fn = (raw_n_data) => {
-      raw_n_data.nodes[addr].name=name;
-      raw_n_data.nodes[addr].module=selectedModule;
-      raw_n_data.nodes[addr].node_type=type;
-      raw_n_data.nodes[addr].location.line_num=lineLocation;
+      raw_n_data.nodes[addr].name = name;
+      raw_n_data.nodes[addr].module = selectedModule;
+      raw_n_data.nodes[addr].node_type = type;
+      raw_n_data.nodes[addr].location.line_num = lineLocation;
       return raw_n_data;
-    } 
+    }
     props.updateNodeData(update_raw_fn);
   }
 
@@ -49,7 +68,7 @@ const NodeEditor = (props) => {
     let update_raw_fn = (raw_n_data) => {
       delete raw_n_data.nodes[addr];
       return raw_n_data;
-    } 
+    }
     props.updateNodeData(update_raw_fn);
     // delete node logic
   }
@@ -57,12 +76,12 @@ const NodeEditor = (props) => {
   return (
     <div className="node-editor">
 
-    <p className="tutorial-div">
-      { props.mode == 'add' ? (
-        <h3>{"Add Node:"}</h3>) : (<h3> {"Edit Node:"}</h3>)
-      }
-      <Tutorial><NodeEditorHelp/></Tutorial>
-    </p>
+      <div className="tutorial-div">
+        {props.mode == 'add' ? (
+          <h3>{"Add Node:"}</h3>) : (<h3> {"Edit Node:"}</h3>)
+        }
+        <Tutorial><NodeEditorHelp /></Tutorial>
+      </div>
       <label className="node-editor__label">
         Name:
         <input className="node-editor__input" type="text" value={name} onChange={handleNameChange} />
@@ -70,11 +89,11 @@ const NodeEditor = (props) => {
 
       <label className="node-editor__label">
         Module:
-        <StringCompletionInput 
+        <StringCompletionInput
           default={selectedModule}
           onUpdate={onUpdateModule}
           list={validModules}
-          />
+        />
       </label>
       <label className="node-editor__label">
         Type:

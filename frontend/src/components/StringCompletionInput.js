@@ -50,7 +50,14 @@ class StringCompletionInput extends React.Component {
   };
 
   onBlur = () => {
-    this.props.onUpdate(this.state.input);
+    // this.props.onUpdate(this.state.input);
+    if (this.state.showSuggestions) {
+      this.setState({
+        input: this.state.suggestions[0],
+        showSuggestions: false,
+      });
+      this.props.onUpdate(this.state.suggestions[0])
+    }
   };
 
   updateSuggestions = () => {
