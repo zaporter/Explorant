@@ -62,7 +62,8 @@ const ExecutionInstanceList = (props) => {
         continue;
       }
       usedfts.push(instance.frame_time);
-      if (hoveredItem != null && instance.frame_time == hoveredItem.frame_time) {
+
+      if (hoveredItem != null && ftmap.times[instance.frame_time] == ftmap.times[hoveredItem.frame_time]) {
         continue;
       } else {
         i_events.push({
