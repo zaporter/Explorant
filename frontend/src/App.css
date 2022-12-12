@@ -106,7 +106,8 @@ h3 {
   border-radius: 2px;
 }
 .lane-viewer {
-  background-color: #295b64;
+  /* background-color: #295b64; */
+  width: 60%;
   margin: 5px;
   padding: 5px;
 }
@@ -129,8 +130,17 @@ h3 {
 
 /* Table styles */
 .execution-instance-list {
-  width: 100%;
+  width:100%;
   border-collapse: collapse;
+}
+.execution-instance-list-split{
+  display: inline-flex;
+
+}
+.execution-instance-list-split-child{
+  width: 40%;
+  padding:0rem 2rem ;
+
 }
 
 /* Header styles */
