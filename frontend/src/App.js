@@ -12,14 +12,14 @@ import { useRemoteResource } from './util.js';
 import { callRemote } from './util.js';
 
 function App() {
-  const [count, _setCount] = useRemoteResource(5, { id: 21 }, 'ping');
   const [generalInfo, _setGeneralInfo] = useRemoteResource(null, {}, 'general_info');
-  const [currentNodeId, setCurrentNodeId] = useState(null);
+  const [currentNodeId, setCurrentNodeId] = useState({id:null,is_raw:false});
   const [highlightedNodeIds, setHighlightedNodeIds] = useState([])
   const updateCurrentNode = (newId) => {
     setCurrentNodeId(newId);
   }
   const [nodesData, setNodeData] = useRemoteResource(null, {}, 'node_data');
+  const [rawNodesData, setRawNodeData] = useRemoteResource(null, {}, 'get_raw_nodes_and_modules',[nodesData]);
   const [currentExecutionInstances, setCurrentExecutionInstances] = useState([{ frame_time: 0, addr: 0, instance_of_addr: 0 }])
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,13 +28,14 @@ function App() {
   
 
   const updateNodeData = (update_raw_fn) => {
-    console.log("UPDATED");
     callRemote({}, 'get_raw_nodes_and_modules')
       .then(resp => resp.json())
       .then(dta => update_raw_fn(dta))
       .then(dta => callRemote(dta,'update_raw_nodes_and_modules')
-        .then(callRemote({},'node_data').then(resp=>resp.json()).then(resp=>setNodeData(resp)))
-        .then(_=>updateCurrentNode(null))
+        .then(_=>callRemote({},'node_data').then(resp=>resp.json()).then(resp=>{console.log(resp);setNodeData(resp)})
+
+        .then(_=>updateCurrentNode({id:null,is_raw:false}))
+        )
       )
   }
 
@@ -55,6 +56,8 @@ function App() {
           <GraphViewer
             key={nodesData}
             nodesData={nodesData}
+            updateNodeData={updateNodeData}
+            rawNodesData={rawNodesData}
             setCurrentFilePath={setCurrentFilePath}
             setCurrentFileLineNum={setCurrentFileLineNum}
             updateCurrentNode={updateCurrentNode} />
@@ -62,31 +65,26 @@ function App() {
           :
           (<p>{"General and node data did not load. Did the backend crash?"}</p>)
       }
-      {currentNodeId && nodesData && <div>
+      {currentNodeId.id != null && nodesData && <div>
         <div className='box-wrapper'>
         <NodeEditor
-          key={currentNodeId}
+          key={currentNodeId.id}
           mode={"edit"}
           generalInfo={generalInfo}
           updateNodeData={updateNodeData}
           nodesData={nodesData}
+          rawNodesData={rawNodesData}
           currentNodeId={currentNodeId} />
           </div>
-         <ExecutionInstanceList 
+        {!currentNodeId.is_raw && <ExecutionInstanceList 
            nodesData={nodesData} 
+           generalInfo={generalInfo} 
            currentNodeId={currentNodeId}
            setHighlightedNodeIds={setHighlightedNodeIds}
            executionInstances={currentExecutionInstances} 
-           setExecutionInstances={setCurrentExecutionInstances} />
-        {/* <LaneViewer 
-        {/*   generalInfo={generalInfo} */}
-        {/*   nodesData={nodesData} */}
-        {/*   executionInstances={currentExecutionInstances} /> */}
+           setExecutionInstances={setCurrentExecutionInstances} />}
       </div>}
 
-      {/* {generalInfo && <p> {JSON.stringify(generalInfo)}</p>} */}
-      <p>{count.id}</p>
-      {/* <p>{generalInfo && JSON.stringify(generalInfo)}</p> */}
     </div>
   );
 }

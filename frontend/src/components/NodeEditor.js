@@ -4,8 +4,8 @@ import { Tutorial, NodeEditorHelp } from '../tutorials.js';
 
 const NodeEditor = (props) => {
   let nodesData = props.nodesData;
-  let nid = props.currentNodeId;
-  const node = nodesData.nodes[nid];
+  let nid = props.currentNodeId.id;
+  const node = props.currentNodeId.is_raw ? props.rawNodesData.nodes[nid] : nodesData.nodes[nid];
   let validModules = Object.keys(nodesData.modules);
   const [selectedModule, setSelectedModule] = useState(props.mode == "add" ? '' : node.module);
   const onUpdateModule = (new_val) => {
@@ -38,26 +38,33 @@ const NodeEditor = (props) => {
         node_type: type,
         location: {
           file: props.file,
-          line_num: lineLocation,
+          line_num: parseInt(lineLocation),
           column_num: 0,
         },
         labeled_transitions: [],
         node_attributes: {},
       };
       raw_n_data.nodes[0] = (new_node);
-      console.log(raw_n_data);
+      raw_n_data.rerun_level = 0;
       return raw_n_data;
     }
     props.updateNodeData(update_raw_fn);
+    props.onClose();
   }
 
   const handleSaveNode = () => {
-    let addr = nodesData.nodes[nid].address;
+    let addr = null;
+    if (!props.currentNodeId.is_raw) {
+      addr = nodesData.nodes[nid].address;
+    }else {
+      addr = props.rawNodesData.nodes[nid].address;
+    }
     let update_raw_fn = (raw_n_data) => {
       raw_n_data.nodes[addr].name = name;
       raw_n_data.nodes[addr].module = selectedModule;
       raw_n_data.nodes[addr].node_type = type;
-      raw_n_data.nodes[addr].location.line_num = lineLocation;
+      raw_n_data.nodes[addr].location.line_num = parseInt(lineLocation);
+      raw_n_data.rerun_level = 0;
       return raw_n_data;
     }
     props.updateNodeData(update_raw_fn);
@@ -67,6 +74,8 @@ const NodeEditor = (props) => {
     let addr = nodesData.nodes[nid].address;
     let update_raw_fn = (raw_n_data) => {
       delete raw_n_data.nodes[addr];
+
+      raw_n_data.rerun_level = 0;
       return raw_n_data;
     }
     props.updateNodeData(update_raw_fn);
@@ -78,7 +87,7 @@ const NodeEditor = (props) => {
 
       <div className="tutorial-div">
         {props.mode == 'add' ? (
-          <h3>{"Add Node:"}</h3>) : (<h3> {"Edit Node:"}</h3>)
+          <h3>{"Add Event"}</h3>) : (<h3> {"Edit Event"}</h3>)
         }
         <Tutorial><NodeEditorHelp /></Tutorial>
       </div>

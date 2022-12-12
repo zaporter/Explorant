@@ -24,13 +24,17 @@ pub_struct!(PingResponse { id: usize });
 
 pub_struct!(Settings {
     version: usize,
+    synoptic_seed:usize,
     use_synoptic: bool,
+    show_unreachable_nodes:bool,
     selected_node_id: Option<usize>,
 });
 impl Default for Settings {
     fn default() -> Self {
         Self {
             version: 0,
+            synoptic_seed:0,
+            show_unreachable_nodes: false,
             use_synoptic: true,
             selected_node_id: None,
         }
@@ -62,6 +66,10 @@ pub_struct!(AllSourceFilesResponse{
 pub_struct!(UpdateRawNodesAndModulesRequest{
     nodes : HashMap<usize,GraphNode>,
     modules : HashMap<String,GraphModule>,
+    // 0 => rerun all 
+    // 1 => rerun synoptic but not program
+    // 2 => Dont rerun
+    rerun_level: u32,
     //require_rerun: bool,
 });
 

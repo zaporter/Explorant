@@ -41,18 +41,38 @@ export const GraphViewerHelp = () => {
         <li><b>Left click on a node:</b> Select that node for further examination. You can then edit the event or go to where it was run in the trace.</li>
         <li><b>Click on the name of a module:</b> Collapse/expand that module</li>
         <li><b>Pan/zoom:</b> Change what file is currently being selected/edited</li>
+        <li><b>Show Unreachable Nodes:</b> Display events in the graph that were never reached in the trace</li>
         </ul>
     </div>);
 };
 export const NodeEditorHelp = () => {
   return (
       <div>
-      <h2>The Node Editor</h2>
-      This component allows you to edit properties of a node such as what line it is instrumenting, what module it is part of, and what it is named. 
+      <h2>The Event Editor</h2>
+      This component allows you to edit properties of an event such as what line it is instrumenting, what module it is part of, and what it is named. 
+        <br/>
+        <br/>
+
 
       The difference between and Event and a Flow is entirely cosmetic and is simply useful to indicate whether you expect a node branch vs whether that node is simply a step along a pipeline.
+        <br/>
+        <br/>
 
-      Also note that if bind this event to a line where there is no available instructions to instrument, it will select the next line where there is an address to watch.
+      Also note that if you set this event to a line where there is no available instructions to instrument, it will select the next line where there is an address to watch.
+      
+    </div>);
+};
+export const ModuleEditorHelp = () => {
+  return (
+      <div>
+      <h2>The Module Editor</h2>
+      This component allows you to update the tree of existing modules and to add new modules. 
+
+        <br/>
+        If you type in the name of a new module, you will create it. If you type in the name of an existing module, you can update its parent. 
+
+        <h3>Warning:</h3>
+        <b>If you create a loop with the modules, it will crash. I do not have loop detection.</b>
       
     </div>);
 };
@@ -61,16 +81,19 @@ export const ExecutionExplorerHelp = () => {
       <div>
       <h2>The Execution Explorer</h2>
 
-        The execution explorer allows you to open up the trace in gdb to any point in time where the node was executed. This can be useful for diving into exactly what happened during this particular execution of the node. 
+        The execution explorer allows you to open up the trace in gdb to any point in time where the node was executed. This can be useful for diving into exactly what happened during this particular execution of the event. 
 
       <h3>Interaction Options</h3>
       <ul>
         <li><b>Click on a list element:</b> Use rr to open up a gdb server at the exact spot in the program that you clicked.</li>
         <li><b>Hover over a list element:</b> Highlight this particular instance of the event on the timeline.</li>
+        <li><b>Shift+drag on timeline:</b> Zoom in on timeline. (Some frame_times are less than 1ms apart and so will be merged regardless of zoom)</li>
+        <li><b>Press Esc on timeline:</b> Reset timeline zoom</li>
         </ul>
         
         <h3>Keep in mind:</h3>
         <b>This component does not currently de-allocate the gdb servers so if you click on many of them, you will quickly eat through your computing resources. This is being worked on. </b>
+        <br/>
         <b>The gdb command may not work instantly as the trace is being fast forwarded to desired location. This will become especially apparent when the spot in the execution is very far through the program. This is being worked on. </b>
       
     </div>);

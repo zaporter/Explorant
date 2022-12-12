@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
 use std::rc::Rc;
@@ -144,73 +146,85 @@ impl GraphBuilder {
     //TODO: This code is heavily flawed and was written hastily in order to get something
     //written
     // TODO : This code is also very fragile and /requires/ tests
-    //
-    pub fn prepare(&mut self, bin_interface: &mut BinaryInterface) -> anyhow::Result<()> {
+    // run_level:
+    // 0 => rerun all
+    // 1 => rerun synoptic but not program
+    // 2 => Dont rerun
+    pub fn prepare(
+        &mut self,
+        bin_interface: &mut BinaryInterface,
+        run_level: u32,
+    ) -> anyhow::Result<()> {
         // bin_interface.pin_mut().restart_from_event(0);
+        if run_level == 0 {
+            let cont = GdbContAction {
+                type_: GdbActionType::ACTION_CONTINUE,
+                target: bin_interface.get_current_thread(),
+                signal_to_deliver: 0,
+            };
+            let step = GdbContAction {
+                type_: GdbActionType::ACTION_STEP,
+                target: bin_interface.get_current_thread(),
+                signal_to_deliver: 0,
+            };
 
-        let cont = GdbContAction {
-            type_: GdbActionType::ACTION_CONTINUE,
-            target: bin_interface.get_current_thread(),
-            signal_to_deliver: 0,
-        };
-        let step = GdbContAction {
-            type_: GdbActionType::ACTION_STEP,
-            target: bin_interface.get_current_thread(),
-            signal_to_deliver: 0,
-        };
-
-        for node in self.nodes.values() {
-            dbg!(&node);
-            if node.address == 0 {
-                anyhow::bail!(
-                    "Node address for {} is 0. This should never happen.",
-                    &node.FQN
-                );
-            }
-            bin_interface.pin_mut().set_sw_breakpoint(node.address, 1);
-        }
-        dbg!(self.nodes.len());
-
-        let mut opened_frame_time: i64 = bin_interface.current_frame_time();
-        self.address_recorder
-            .reset_ft_for_writing(opened_frame_time as usize);
-
-        let mut signal = 5;
-        while signal == 5 {
-            let rip = bin_interface
-                .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
-                .to_usize();
-            dbg!(&rip);
-            let current_ft = bin_interface.current_frame_time();
-            if current_ft != opened_frame_time {
-                self.address_recorder.finished_writing_ft();
-                opened_frame_time = current_ft;
-                self.address_recorder
-                    .reset_ft_for_writing(opened_frame_time as usize);
-            }
-            // serious problems about efficiently telling if this is an address of a node
-            // or of a timestamp
-            if self.nodes.contains_key(&rip) {
-                self.address_recorder.insert_address(rip);
-
-                // meaning there is a breakpoint at rip
-                // so we have to step over it when there is no
-                // breakpoint
-                bin_interface.pin_mut().remove_sw_breakpoint(rip, 1);
-                signal = bin_interface.pin_mut().continue_forward(step).unwrap();
-                if signal != 5 {
-                    break;
+            for node in self.nodes.values() {
+                // dbg!(&node);
+                if node.address == 0 {
+                    anyhow::bail!(
+                        "Node address for {} is 0. This should never happen.",
+                        &node.FQN
+                    );
                 }
-                bin_interface.pin_mut().set_sw_breakpoint(rip, 1);
+                bin_interface.pin_mut().set_sw_breakpoint(node.address, 1);
             }
+            dbg!(self.nodes.len());
 
-            signal = bin_interface.pin_mut().continue_forward(cont).unwrap();
+            let mut opened_frame_time: i64 = bin_interface.current_frame_time();
+            self.address_recorder
+                .reset_ft_for_writing(opened_frame_time as usize);
+
+            let mut signal = 5;
+            while signal == 5 {
+                let rip = bin_interface
+                    .get_register(GdbRegister::DREG_RIP, bin_interface.get_current_thread())
+                    .to_usize();
+                let current_ft = bin_interface.current_frame_time();
+                if current_ft != opened_frame_time {
+                    self.address_recorder.finished_writing_ft();
+                    opened_frame_time = current_ft;
+                    self.address_recorder
+                        .reset_ft_for_writing(opened_frame_time as usize);
+                }
+                // serious problems about efficiently telling if this is an address of a node
+                // or of a timestamp
+                if self.nodes.contains_key(&rip) {
+                    self.address_recorder.insert_address(rip);
+
+                    // meaning there is a breakpoint at rip
+                    // so we have to step over it when there is no
+                    // breakpoint
+                    bin_interface.pin_mut().remove_sw_breakpoint(rip, 1);
+                    signal = bin_interface.pin_mut().continue_forward(step).unwrap();
+                    if signal != 5 {
+                        break;
+                    }
+                    bin_interface.pin_mut().set_sw_breakpoint(rip, 1);
+                }
+
+                signal = bin_interface.pin_mut().continue_forward(cont).unwrap();
+            }
+            self.address_recorder.finished_writing_ft();
+
+            // Remove all set swbreakpoints to not alter internal state of machine
+            for node in self.nodes.values() {
+                bin_interface
+                    .pin_mut()
+                    .remove_sw_breakpoint(node.address, 1);
+            }
         }
-
-        self.address_recorder.finished_writing_ft();
-
         // Record locations in test.log, run synoptic, then read the output file
-        {
+        if run_level == 0 || run_level == 1 {
             let base = "/home/zack/Tools/MQP/code_slicer";
             // make sure to delete the out.gml file so we don't use stale data
             // intentionally dont fail if the file doesn't exist
@@ -223,7 +237,6 @@ impl GraphBuilder {
             let node_names = addresses.map(|addr| &self.nodes.get(&addr).unwrap().FQN);
             let mut output = File::create(format!("{}/synoptic/shared/test.log", &base))?;
             for name in node_names {
-                dbg!(&name);
                 writeln!(output, "{}", name)?;
             }
             let out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
@@ -234,12 +247,6 @@ impl GraphBuilder {
 
             self.build_synoptic_nodes(&graph);
             self.gml_graph = Some(graph);
-        }
-        // Remove all set swbreakpoints to not alter internal state of machine
-        for node in self.nodes.values() {
-            bin_interface
-                .pin_mut()
-                .remove_sw_breakpoint(node.address, 1);
         }
 
         self.is_prepared = true;
@@ -252,6 +259,7 @@ impl GraphBuilder {
         self.address_recorder.get_addr_occurrences(*addr)
     }
     fn build_synoptic_nodes(&mut self, gml_graph: &gml_parser::Graph) {
+        self.synoptic_nodes.clear();
         'outer: for gml_node in &gml_graph.nodes {
             for (_, my_node) in &self.nodes {
                 if my_node.FQN == gml_node.label.clone().unwrap() {
@@ -342,15 +350,19 @@ impl GraphBuilder {
         parent_name: Option<&str>,
         parent_scope: &mut Scope,
         nodes: &Vec<gml_parser::Node>,
-        // nodes: &Vec<GraphNode>,
         edges: &Vec<gml_parser::Edge>,
         settings: &Settings,
         collapsed_module_map: &Vec<(Vec<i64>, i64)>,
     ) {
         if parent_name.is_some() {
-            parent_scope.set_label(parent_name.unwrap());
+            parent_scope
+                .set_font_size(20.)
+                .set_pen_width(2.)
+                .set_style(dot_writer::Style::Rounded)
+                .set_label(parent_name.unwrap());
         }
         let mut module_nodes = Vec::new();
+        let mut module_fqns = HashSet::new();
         for node in nodes {
             let label = &node.label.clone().unwrap();
             if label == "INITIAL" || label == "TERMINAL" {
@@ -364,11 +376,12 @@ impl GraphBuilder {
             let (p_name, s_name) = Self::get_direct_module_parent(&label);
             if p_name == parent_name {
                 module_nodes.push(node);
+                module_fqns.insert(label.clone());
                 // Check if node is collapsed and add the collapsed node
                 for (collapsed_group, new_id) in collapsed_module_map {
                     if collapsed_group.contains(&node.id) {
                         parent_scope
-                            .node_named(format!("N{}", new_id))
+                            .node_named(format!("C{}", new_id))
                             .set_label("...");
                         // Do not continue adding nodes or children
                         return;
@@ -376,6 +389,35 @@ impl GraphBuilder {
                 }
             }
         }
+
+        // ADD ALL OF THE UN-RUN EVENTS TO THE MODULE
+        if settings.show_unreachable_nodes {
+            let mut unruncluster = parent_scope.cluster();
+            unruncluster.set_label("Unreachable")
+                        .set_pen_width(1.)
+                        .set_style(dot_writer::Style::Dashed);
+            for event in self.nodes.values() {
+                let (p_name, s_name) = Self::get_direct_module_parent(&event.FQN);
+                if p_name == parent_name {
+                    if !module_fqns.contains(&event.FQN) {
+                        // PURE LUCK THAT THIS WORKS
+                        let is_selected = Some(event.address as usize) == settings.selected_node_id;
+                        let color: dot_writer::Color = if is_selected {
+                            dot_writer::Color::Red
+                        } else {
+                            dot_writer::Color::Black
+                        };
+                        unruncluster
+                            .node_named(format!("U{}", event.address))
+                            .set_color(color)
+                            .set_pen_width(1.)
+                            .set_style(dot_writer::Style::Dashed)
+                            .set_label(s_name);
+                    }
+                }
+            }
+        }
+        //DO ALL OF THE GROUPS
         let groups = Self::get_synoptic_node_groups(&module_nodes, edges);
         for group in groups {
             let group_len = group.len();
@@ -385,7 +427,10 @@ impl GraphBuilder {
             } else {
                 parent_scope.cluster()
             };
-            cluster.set_label("");
+            cluster.set_label("")
+                    .set_pen_width(1.)
+                    .set_style(dot_writer::Style::Dashed);
+
             for node in group {
                 let label = &node.label.clone().unwrap();
                 let is_selected = Some(node.id as usize) == settings.selected_node_id;
@@ -431,12 +476,17 @@ impl GraphBuilder {
             }
         }
     }
+    fn calculate_hash(t: &str) -> u64 {
+        let mut s = DefaultHasher::new();
+        t.hash(&mut s);
+        s.finish() / 10000000000
+    }
     fn get_collapsed_children_recursive(
         &self,
         mut is_collapsed: bool,
         current_module_str: &str,
     ) -> Vec<(Vec<i64>, i64)> {
-        let mut collapsed_module_ignore: (Vec<i64>, i64) = (Vec::new(),0);
+        let mut collapsed_module_ignore: (Vec<i64>, i64) = (Vec::new(), (Self::calculate_hash(current_module_str) as i64).abs());
         if !is_collapsed {
             let this_module = self.modules.get(current_module_str).unwrap();
             if this_module.module_attributes.get("collapsed") == Some(&"true".to_string()) {
@@ -449,9 +499,6 @@ impl GraphBuilder {
             for (id, node) in &self.synoptic_nodes {
                 if node.module == current_module_str {
                     collapsed_module_ignore.0.push(*id as i64);
-                    if collapsed_module_ignore.1 == 0 {
-                        collapsed_module_ignore.1 = *id as i64;
-                    }
                 }
             }
         }
@@ -466,10 +513,7 @@ impl GraphBuilder {
                 // if this is a collapsed module, we will only be returning 1
                 // giant vec
                 if is_collapsed {
-                    let child_children = self.get_collapsed_children_recursive(
-                        true,
-                        mod_name,
-                    );
+                    let child_children = self.get_collapsed_children_recursive(true, mod_name);
                     for elem in &child_children[0].0 {
                         to_ret[0].0.push(*elem);
                     }
@@ -477,10 +521,7 @@ impl GraphBuilder {
                 // if this is not a collapsed module, then each of the children who return vectors
                 // need to have their vectors flat-inserted into this one
                 else {
-                    let child_children = self.get_collapsed_children_recursive(
-                        false,
-                        mod_name,
-                    );
+                    let child_children = self.get_collapsed_children_recursive(false, mod_name);
                     for list in child_children {
                         to_ret.push(list);
                     }
@@ -510,7 +551,9 @@ impl GraphBuilder {
             let mut writer = DotWriter::from(&mut output_bytes);
             writer.set_pretty_print(false);
             let mut digraph = writer.digraph();
-            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> = self.get_collapsed_children_recursive(false, "");
+            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> =
+                self.get_collapsed_children_recursive(false, "");
+            dbg!(&collapsed_module_map);
 
             self.create_node_recursive(
                 None,
@@ -529,28 +572,32 @@ impl GraphBuilder {
                 //         continue 'edge;
                 //     }
                 // }
-                
+
                 let mut source = edge.source;
                 let mut target = edge.target;
-                
+                let mut src_prefix = "N";
+                let mut target_prefix = "N";
+
                 for collapsed_module in &collapsed_module_map {
                     if collapsed_module.0.contains(&source) {
                         source = collapsed_module.1;
+                        src_prefix = "C";
+                        break;
                     }
-                    break;
                 }
                 for collapsed_module in &collapsed_module_map {
                     if collapsed_module.0.contains(&target) {
                         target = collapsed_module.1;
+                        target_prefix = "C";
+                        break;
                     }
-                    break;
                 }
                 if source == target {
                     continue 'edge;
                 }
 
                 let mut attribs = digraph
-                    .edge(format!("N{}", source), format!("N{}", target))
+                    .edge(format!("{}{}",src_prefix, source), format!("{}{}", target_prefix, target))
                     .attributes();
                 if let Some(label) = edge.label.clone() {
                     let val = &label[3..];

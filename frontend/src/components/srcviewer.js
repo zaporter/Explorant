@@ -7,12 +7,13 @@ import { a11yDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import StringCompletionInput from './StringCompletionInput.js';
 import TextModal from './TextModal.js';
 import NodeEditor from './NodeEditor.js'
+import ModuleEditor from './ModuleEditor.js'
 import {Tutorial, SrcReaderHelp} from '../tutorials.js';
 const SrcViewer = (props) => {
   let nodesData = props.nodesData;
   
   // This had better be an even number
-  const numLines = 40;
+  const numLines = 30;
 
   let currentFile = props.currentFilePath ? {file: props.currentFilePath,line_num:props.currentFileLineNum} : {file:"[none selected]", line_num:0};
   const [centeredLine, setCenteredLine] = useState(props.currentFileLineNum-(numLines/2));
@@ -41,10 +42,8 @@ const SrcViewer = (props) => {
   const handleScroll = (event) => {
     if (event.shiftKey) {
       event.preventDefault();
-      console.log(event.deltaY);
       let amount = Math.floor(event.deltaY / 25);
       let newLineNum = centeredLine+amount;
-      console.log(numLinesInFile);
       setCenteredLine(Math.min(numLinesInFile-numLines,Math.max(0,newLineNum)));
     }
   };
@@ -54,6 +53,7 @@ const SrcViewer = (props) => {
   const [y, setY] = useState(0);
   const [clickedLineNum, setClickedLineNum] = useState(0);
   const [showAddNodeModal, setShowAddNodeModal] = useState(false);
+  const [showUpdateModuleModal, setShowUpdateModuleModal] = useState(false);
 
   const handleRightClick = (e) => {
     e.preventDefault();
@@ -64,11 +64,11 @@ const SrcViewer = (props) => {
    const addEvent = () => {
      setShowAddNodeModal(true);
      setShowDropdown(false);
-    // Add Event code here
   }
 
   const addModule = () => {
-    // Add Module Definition code here
+     setShowUpdateModuleModal(true);
+     setShowDropdown(false);
   }
   const handleClick = (e) => {
     if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -83,7 +83,7 @@ const SrcViewer = (props) => {
             ➕ Add Event
           </div>
           <div className="src-viewer-dropdown-option" onClick={addModule}>
-            ➕ Add Module Definition
+            ➕ Add / Update Module 
           </div>
         </div>
       )}
@@ -137,10 +137,20 @@ const SrcViewer = (props) => {
         <NodeEditor 
           mode={"add"}
           name="name"
+          currentNodeId={{id:0,is_raw:false}}
           line={clickedLineNum}
           file={currentFile.file}
           updateNodeData={props.updateNodeData}
+          onClose={()=>{setShowAddNodeModal(false)}}
           nodesData={props.nodesData}/>
+      </TextModal>}
+    {showUpdateModuleModal && <TextModal onClose={()=>{setShowUpdateModuleModal(false)}}>
+      <ModuleEditor
+        nodesData={props.nodesData}
+        updateNodeData={props.updateNodeData}
+        onClose={()=>{setShowUpdateModuleModal(false)}}
+      />
+
       </TextModal>}
     </div>
   );

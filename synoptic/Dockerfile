@@ -10,4 +10,4 @@ RUN git clone --depth 1 https://github.com/ModelInference/synoptic
 RUN cd synoptic; ant synoptic
 
 # ENTRYPOINT cd synoptic; ./synoptic-jar.sh -h
-ENTRYPOINT cd synoptic; ./synoptic-jar.sh --exportAsGML -o /shared/out -j /shared/test.log
+ENTRYPOINT cd synoptic; ./synoptic-jar.sh --randomSeed=1 --exportAsGML -o /shared/out -j /shared/test.log

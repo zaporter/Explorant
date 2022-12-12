@@ -138,7 +138,7 @@ impl RunningGdbInstance {
                 bail!("Failed to launch before port opened!");
             }else {
                 // still alive
-                std::thread::sleep_ms(50);
+                std::thread::sleep(std::time::Duration::from_millis(50));
             }
         }
         // Not available, must have been grabbed by our program

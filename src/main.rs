@@ -252,7 +252,7 @@ async fn update_raw_nodes_and_modules(
     settings.selected_node_id = None;
     graph_builder.update_raw_modules(req.modules).unwrap();
     graph_builder.update_raw_nodes(req.nodes, &erebor).unwrap();
-    graph_builder.prepare(&mut bin_interface);
+    graph_builder.prepare(&mut bin_interface, req.rerun_level);
     
 
     let resp = UpdateRawNodesAndModulesResponse {
@@ -371,7 +371,7 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/get_raw_nodes_and_modules").route(web::post().to(get_raw_nodes_and_modules)))
             .service(web::resource("/update_raw_nodes_and_modules").route(web::post().to(update_raw_nodes_and_modules)))
     })
-    .workers(1)
+    .workers(3)
     .bind((ip, port))?
     .run()
     .await
