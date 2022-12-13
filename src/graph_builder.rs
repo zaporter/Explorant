@@ -1,28 +1,21 @@
-use std::borrow::Cow;
-use std::cell::RefCell;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::process::Command;
-use std::rc::Rc;
-use std::{collections::HashSet, io::BufWriter};
 
 use dot_writer::{Attributes, DotWriter, Scope};
 use gml_parser::GMLObject;
-use itertools::Itertools;
-use itertools::TupleWindows;
 use librr_rs::BinaryInterface;
-use std::fs::{self, File, OpenOptions};
-use std::ops::Range;
+use std::fs::File;
 
-use crate::address_recorder::{self, AddrIter};
 use crate::erebor::Erebor;
 use crate::file_parsing;
 use crate::shared_structs::{GraphModule, Settings};
 use crate::{
     address_recorder::AddressRecorder,
-    query::node::TimeRange,
+    // query::node::TimeRange,
     shared_structs::{GraphNode, TimeStamp},
 };
 use librr_rs::*;
@@ -35,9 +28,6 @@ use librr_rs::*;
 //
 pub struct GraphBuilder {
     address_recorder: AddressRecorder,
-    //graph_nodes : HashMap<usize,GraphNode>,
-    ranges: Vec<TimeRange>,
-    breakpoints: HashSet<usize>,
     is_prepared: bool,
     gml_graph: Option<gml_parser::Graph>,
     pub modules: HashMap<String, GraphModule>,
@@ -54,16 +44,11 @@ impl GraphBuilder {
             address_recorder: AddressRecorder::new(max_ft),
             nodes: HashMap::new(),
             synoptic_nodes: HashMap::new(),
-            ranges: Vec::new(),
-            breakpoints: HashSet::new(),
             is_prepared: false,
             gml_graph: None,
             modules: HashMap::new(),
         }
     }
-    // pub fn get_parent_tree_nodes_syn() -> Option<Vec<usize>>{
-
-    // }
     pub fn update_raw_nodes(
         &mut self,
         mut nodes: HashMap<usize, GraphNode>,
@@ -120,14 +105,6 @@ impl GraphBuilder {
         self.is_prepared = false;
         self.modules = modules;
         Ok(())
-    }
-    pub fn insert_time_range(&mut self, ts: TimeRange) {
-        self.ranges.push(ts);
-        self.is_prepared = false;
-    }
-    pub fn insert_node(&mut self, node: GraphNode) {
-        self.nodes.insert(node.address, node);
-        self.is_prepared = false;
     }
 
     pub fn get_graph_as_dot(&mut self, settings: &Settings) -> anyhow::Result<Option<String>> {
@@ -229,10 +206,8 @@ impl GraphBuilder {
             let base = "/home/zack/Tools/MQP/code_slicer";
             // make sure to delete the out.gml file so we don't use stale data
             // intentionally dont fail if the file doesn't exist
-            std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base));
+            let _ = std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base));
 
-            // let addresses_2 : Vec<usize> = self.address_recorder.get_all_addresses().unwrap().collect();
-            // dbg!(addresses_2);
             let addresses = self.address_recorder.get_all_addresses().unwrap();
             //let it: TupleWindows<AddrIter, (usize,usize)> = addresses.tuple_windows();
             let node_names = addresses.map(|addr| &self.nodes.get(&addr).unwrap().FQN);
@@ -240,7 +215,7 @@ impl GraphBuilder {
             for name in node_names {
                 writeln!(output, "{}", name)?;
             }
-            let out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
+            let _out = Command::new(format!("{}/synoptic/run.sh", &base)).output()?;
             let gml_data = std::fs::read_to_string(format!("{}/synoptic/shared/out.gml", &base))
                 .unwrap_or("graph [\n]".into());
             let root = GMLObject::from_str(&gml_data)?;
@@ -278,7 +253,7 @@ impl GraphBuilder {
         let mut groups: Vec<Vec<&gml_parser::Node>> = Vec::new();
         let mut outgoing_pairs = Vec::new(); // Node -> id
         let mut incoming_pairs = Vec::new(); // id -> Node
-        'node_loop: for node in module_nodes {
+        for node in module_nodes {
             let mut incoming_pair = None;
             let mut outgoing_pair = None;
 
@@ -315,12 +290,12 @@ impl GraphBuilder {
                 }
             }
         }
-        'pair: for strict_pair in strict_pairs {
+        for strict_pair in strict_pairs {
             let source = strict_pair.0;
             let dest = strict_pair.1;
             let mut src_group = None;
             let mut dest_group = None;
-            for (index,group) in groups.iter().enumerate() {
+            for (index, group) in groups.iter().enumerate() {
                 if group.contains(&source) {
                     if src_group.is_some() {
                         panic!("Duplicate src group entries. This is not allowed.");
@@ -340,26 +315,12 @@ impl GraphBuilder {
                 groups[src_group.unwrap()].push(dest);
             } else if src_group.is_none() && dest_group.is_some() {
                 groups[dest_group.unwrap()].push(source);
-            } else { //both are some
+            } else {
+                //both are some
                 let dest_group_vals = groups[dest_group.unwrap()].clone();
                 groups[src_group.unwrap()].extend(dest_group_vals);
                 groups.swap_remove(dest_group.unwrap());
             }
-            // for mut group in &mut groups {
-            //     if group.contains(&source) {
-            //         if !group.contains(&dest) {
-            //             group.push(dest);
-            //         }
-            //         continue 'pair;
-            //     } else if group.contains(&dest) {
-            //         if !group.contains(&source) {
-            //             group.push(source);
-            //         }
-            //         continue 'pair;
-            //     }
-            // }
-            // Not in any group, create a new group
-            // groups.push(vec![source, dest]);
         }
         // Add all of the solo nodes to their own
         // single groups
@@ -421,9 +382,10 @@ impl GraphBuilder {
         // ADD ALL OF THE UN-RUN EVENTS TO THE MODULE
         if settings.show_unreachable_nodes {
             let mut unruncluster = parent_scope.cluster();
-            unruncluster.set_label("Unreachable")
-                        .set_pen_width(1.)
-                        .set_style(dot_writer::Style::Dashed);
+            unruncluster
+                .set_label("Unreachable")
+                .set_pen_width(1.)
+                .set_style(dot_writer::Style::Dashed);
             for event in self.nodes.values() {
                 let (p_name, s_name) = Self::get_direct_module_parent(&event.FQN);
                 if p_name == parent_name {
@@ -455,9 +417,10 @@ impl GraphBuilder {
             } else {
                 parent_scope.cluster()
             };
-            cluster.set_label("")
-                    .set_pen_width(1.)
-                    .set_style(dot_writer::Style::Dashed);
+            cluster
+                .set_label("")
+                .set_pen_width(1.)
+                .set_style(dot_writer::Style::Dashed);
 
             for node in group {
                 let label = &node.label.clone().unwrap();
@@ -514,7 +477,10 @@ impl GraphBuilder {
         mut is_collapsed: bool,
         current_module_str: &str,
     ) -> Vec<(Vec<i64>, i64)> {
-        let mut collapsed_module_ignore: (Vec<i64>, i64) = (Vec::new(), (Self::calculate_hash(current_module_str) as i64).abs());
+        let mut collapsed_module_ignore: (Vec<i64>, i64) = (
+            Vec::new(),
+            (Self::calculate_hash(current_module_str) as i64).abs(),
+        );
         if !is_collapsed {
             let this_module = self.modules.get(current_module_str).unwrap();
             if this_module.module_attributes.get("collapsed") == Some(&"true".to_string()) {
@@ -579,7 +545,7 @@ impl GraphBuilder {
             let mut writer = DotWriter::from(&mut output_bytes);
             writer.set_pretty_print(false);
             let mut digraph = writer.digraph();
-            let mut collapsed_module_map: Vec<(Vec<i64>, i64)> =
+            let collapsed_module_map: Vec<(Vec<i64>, i64)> =
                 self.get_collapsed_children_recursive(false, "");
 
             self.create_node_recursive(
@@ -620,13 +586,16 @@ impl GraphBuilder {
                         break;
                     }
                 }
-                if edge_vec.contains(&(source,target)) {
+                if edge_vec.contains(&(source, target)) {
                     continue 'edge;
                 }
-                edge_vec.insert((source,target));
+                edge_vec.insert((source, target));
 
                 let mut attribs = digraph
-                    .edge(format!("{}{}",src_prefix, source), format!("{}{}", target_prefix, target))
+                    .edge(
+                        format!("{}{}", src_prefix, source),
+                        format!("{}{}", target_prefix, target),
+                    )
                     .attributes();
                 if let Some(label) = edge.label.clone() {
                     let val = &label[3..];

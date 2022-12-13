@@ -1,4 +1,3 @@
-use druid::piet::util::first_strong_rtl;
 use iced_x86::{
     Code, ConditionCode, Decoder, DecoderOptions, FlowControl, Instruction, InstructionInfoFactory,
     OpKind, Register, RflagsBits,

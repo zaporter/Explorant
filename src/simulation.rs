@@ -8,8 +8,8 @@ use procmaps::Map;
 use rust_lapper::{Interval, Lapper};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
-use symbolic_common::{Language, Name};
-use symbolic_demangle::{Demangle, DemangleOptions};
+// use symbolic_common::{Language, Name};
+// use symbolic_demangle::{Demangle, DemangleOptions};
 
 use crate::gdb_instance_manager::GdbInstanceManager;
 use crate::shared_structs::LineLocation;
@@ -48,18 +48,18 @@ pub struct Simulation {
 unsafe impl Send for Simulation {}
 unsafe impl Sync for Simulation {}
 
-fn get_symbols<'a>(
-    file: &'a object::File,
-) -> Result<Vec<(String, object::Symbol<'a, 'a>)>, Box<dyn Error>> {
-    let mut to_ret = Vec::new();
-    for symbol in file.symbol_table().ok_or("No symboltable found")?.symbols() {
-        let name: String = Name::from(symbol.name().unwrap())
-            .try_demangle(DemangleOptions::name_only())
-            .to_string();
-        to_ret.push((name, symbol));
-    }
-    Ok(to_ret)
-}
+// fn get_symbols<'a>(
+//     file: &'a object::File,
+// ) -> Result<Vec<(String, object::Symbol<'a, 'a>)>, Box<dyn Error>> {
+//     let mut to_ret = Vec::new();
+//     for symbol in file.symbol_table().ok_or("No symboltable found")?.symbols() {
+//         let name: String = Name::from(symbol.name().unwrap())
+//             .try_demangle(DemangleOptions::name_only())
+//             .to_string();
+//         to_ret.push((name, symbol));
+//     }
+//     Ok(to_ret)
+// }
 
 impl Simulation {
     pub fn reset_the_bin_interface(&self) -> anyhow::Result<BinaryInterface> {

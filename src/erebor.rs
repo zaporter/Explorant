@@ -1,7 +1,5 @@
 use crate::shared_structs::{FileInfo, Function, GraphModule, GraphNode, LineLocation};
 use object::{Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, SectionKind, Segment};
-use symbolic_common::{Language, Name};
-use symbolic_demangle::{Demangle, DemangleOptions};
 
 use fallible_iterator::FallibleIterator;
 
