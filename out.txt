@@ -1,1 +1,0 @@
-Running MVP on "/home/zack/test_glibc_recording"
