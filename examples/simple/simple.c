@@ -17,6 +17,9 @@ int main() {
     // [[{type:"event", name:"::count to 10"}]]
     printf("Counting to 10\n");
     count_to(10);
+    // [[{type:"event", name:"::count to 10"}]]
+    printf("Counting to 10\n");
+    count_to(10);
     // [[{type:"event", name:"::count to 7"}]]
     printf("Counting to 7\n");
     count_to(7);

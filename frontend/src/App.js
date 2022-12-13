@@ -65,7 +65,8 @@ function App() {
           :
           (<p>{"General and node data did not load. Did the backend crash?"}</p>)
       }
-      {currentNodeId.id != null && nodesData && <div>
+      {currentNodeId.id != null && nodesData && 
+        <SplitLayout>
         <div className='box-wrapper'>
         <NodeEditor
           key={currentNodeId.id}
@@ -83,7 +84,9 @@ function App() {
            setHighlightedNodeIds={setHighlightedNodeIds}
            executionInstances={currentExecutionInstances} 
            setExecutionInstances={setCurrentExecutionInstances} />}
-      </div>}
+      </SplitLayout>
+
+      }
 
     </div>
   );

@@ -563,6 +563,7 @@ impl GraphBuilder {
                 settings,
                 &collapsed_module_map,
             );
+            let mut edge_vec = HashSet::new();
             'edge: for edge in &gml_graph.edges {
                 // for node in &gml_graph.nodes{
                 //     if node.id == edge.source && node.label == Some("INITIAL".into()) {
@@ -592,9 +593,10 @@ impl GraphBuilder {
                         break;
                     }
                 }
-                if source == target {
+                if edge_vec.contains(&(source,target)) {
                     continue 'edge;
                 }
+                edge_vec.insert((source,target));
 
                 let mut attribs = digraph
                     .edge(format!("{}{}",src_prefix, source), format!("{}{}", target_prefix, target))

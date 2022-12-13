@@ -1934,7 +1934,7 @@ fn dump_line_program<R: Reader, W: Write>(
             file_info_lines
                 .entry(line as u32)
                 .or_insert_with(|| Vec::new())
-                .push(row.address() as usize);
+                .push(row.address() as usize + 0x555555554000);
             // file_info_lines.insert(line as u32, row.address() as usize);
             //
             // insert the line into the erebor lines tree

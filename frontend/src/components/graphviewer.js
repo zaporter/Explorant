@@ -34,7 +34,7 @@ const GraphViewer = (props) => {
   // }, []);
   const id = useMemo(getId, []);
   const [graphVer, setGraphVer] = React.useState(0);
-  const [dotSrc, _setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph', [props.nodesData, graphVer]);
+  const [dotSrc, _setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph', [props.nodesData, graphVer,null]);
   const [initialSettings, setSettings] = useRemoteResource({show_unreachable_nodes:false, selected_node_id:0}, {}, 'get_settings', []);
 
   const defaultOptions = {
@@ -123,7 +123,7 @@ const GraphViewer = (props) => {
     }).renderDot(dotSrc.dot).on("end", interactive);
     // gviz.renderDot(dotSrc.dot).on("end",interactive);
 
-  }, [dotSrc]);
+  }, [dotSrc,graphVer,null]);
 
   return (
     <div className="box-wrapper">
@@ -132,6 +132,7 @@ const GraphViewer = (props) => {
           <h3>{"Graph Viewer"}</h3>
           <Tutorial><GraphViewerHelp /></Tutorial>
         </div>
+        <button onClick={()=>{setGraphVer(graphVer+1)}}>↻</button>
         <div className="graph-viewer" id={id} />
         <div style={{display:"inline-flex", gap:"20px"}}>
           <p> Display unreachable events: </p>
