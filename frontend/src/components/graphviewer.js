@@ -15,6 +15,7 @@ const getId = () => `graphviz${counter++}`;
 const GraphViewer = (props) => {
   const [height, setHeight] = React.useState(10);
   const [width, setWidth] = React.useState(10);
+  const [selectVisualUpdate, setSelectVisualUpdate] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(false);
   var updateCurrentNode_int = props.updateCurrentNode;
 
@@ -36,7 +37,7 @@ const GraphViewer = (props) => {
   // }, []);
   const id = useMemo(getId, []);
   const [graphVer, setGraphVer] = React.useState(0);
-  const [dotSrc, _setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph', [props.nodesData, graphVer,null]);
+  const [dotSrc, _setDotSrc] = useRemoteResource({ version: 0, dot: `digraph { graph [label="No Loaded Graph"] }` }, {}, 'current_graph', [props.nodesData, graphVer]);
   const [initialSettings, setSettings] = useRemoteResource({show_unreachable_nodes:false, selected_node_id:0}, {}, 'get_settings', []);
 
   const defaultOptions = {
@@ -84,7 +85,6 @@ const GraphViewer = (props) => {
         let respective = null;
         if (is_raw) {
           respective = props.rawNodesData.nodes[key];
-          console.log(props.rawNodesData.nodes);
         }else {
           respective = props.nodesData.nodes[key];
         }
@@ -93,14 +93,14 @@ const GraphViewer = (props) => {
           .then(response => response.json())
           .then(old_settings => { old_settings.selected_node_id = key; return old_settings })
           .then(new_settings => callRemote({ "settings": new_settings }, "set_settings")//.then(
-            .then(_ => unstable_batchedUpdates(() => {
-              setGraphVer(graphVer + 1)
+            .then(_ => /*unstable_batchedUpdates(() => */{
               if (!is_collapsed && respective != null) {
                 updateCurrentNode_int({id:key,is_raw:is_raw})
                 props.setCurrentFilePath(respective.location.file)
                 props.setCurrentFileLineNum(respective.location.line_num)
               }
-            })))
+              setGraphVer(graphVer + 1)
+            }))//)
         //) 
         // .then(_ => updateCurrentNode_int(key))
       });
@@ -117,14 +117,17 @@ const GraphViewer = (props) => {
             })))
   }
   useEffect(() => {
-    const gviz = graphviz(`#${id}`, { ...defaultOptions });
-    gviz.transition(function() {
-      return d3.transition()
-        .delay(0)
-        .duration(100);
-    }).renderDot(dotSrc.dot).on("end", interactive);
+    if (selectVisualUpdate){
+      const gviz = graphviz(`#${id}`, { ...defaultOptions });
+      gviz.transition(function() {
+        return d3.transition()
+          .delay(0)
+          .duration(100);
+      }).renderDot(dotSrc.dot).on("end", interactive);
+    }
+    // gviz.transition(transition_t).renderDot(dotSrc.dot).on("end", interactive);
 
-  }, [dotSrc,graphVer,null]);
+  }, [dotSrc,graphVer]);
 
   useEffect(()=>{
     setGraphVer(graphVer+1);
@@ -137,14 +140,35 @@ const GraphViewer = (props) => {
           <h3>{"Graph Viewer"}</h3>
           <Tutorial><GraphViewerHelp /></Tutorial>
         </div>
-        <button onClick={()=>{setGraphVer(graphVer+1)}}>↻</button>
+        <button onClick={()=>{
+          const gviz = graphviz(`#${id}`, { ...defaultOptions });
+          gviz.transition(function() {
+            return d3.transition()
+              .delay(0)
+              .duration(100);
+          }).renderDot(dotSrc.dot).on("end", interactive);
+        }}>↻</button>
         <div className="graph-viewer" id={id} />
         <div style={{display:"inline-flex", gap:"20px"}}>
           <p> Display unreachable events: </p>
           <div style={{padding:"0.9em 0em"}}>
           <Switch onChange={handleShowUnreachableNodes} checked={initialSettings.show_unreachable_nodes} />
           </div>
+        </div>
+        <br/>
+        <div style={{display:"inline-flex", gap:"20px"}}>
+          <p> Rerender graph on updates: </p>
+          <div style={{padding:"0.9em 0em"}}>
+            <Switch onChange={(new_val)=>{
+            if (new_val) {
+              setSelectVisualUpdate(true);
+              setGraphVer(graphVer+1);
+            }else{
+              setSelectVisualUpdate(false);
+            }
+              }} checked={selectVisualUpdate} />
           </div>
+        </div>
       </div>
     </div>
   );

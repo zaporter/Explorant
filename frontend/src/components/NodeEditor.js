@@ -71,7 +71,12 @@ const NodeEditor = (props) => {
   }
 
   const handleDeleteNode = () => {
-    let addr = nodesData.nodes[nid].address;
+    let addr = null;
+    if (!props.currentNodeId.is_raw) {
+      addr = nodesData.nodes[nid].address;
+    }else {
+      addr = props.rawNodesData.nodes[nid].address;
+    }
     let update_raw_fn = (raw_n_data) => {
       delete raw_n_data.nodes[addr];
 

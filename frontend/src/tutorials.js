@@ -48,6 +48,7 @@ export const GraphViewerHelp = () => {
         <li><b>Click on the name of a module:</b> Collapse/expand that module</li>
         <li><b>Pan/zoom:</b> Change what file is currently being selected/edited</li>
         <li><b>Show Unreachable Nodes:</b> Display events in the graph that were never reached in the trace</li>
+        <li><b>Rerender Graph on Updates:</b> Toggle graph reloading. Graph reloading is very slow and sometimes it can be helpful to not have it running.</li>
         <li><b>Press the refresh (↻) button:</b> Reload the graph. This will fix most visual bugs relating to resizing or if the graph didn't load upon starting</li>
         </ul>
     </div>);

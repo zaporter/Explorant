@@ -15,13 +15,11 @@ import { callRemote } from './util.js';
 function App() {
   const [generalInfo, _setGeneralInfo] = useRemoteResource(null, {}, 'general_info');
   const [currentNodeId, setCurrentNodeId] = useState({ id: null, is_raw: false });
-  const [highlightedNodeIds, setHighlightedNodeIds] = useState([])
   const updateCurrentNode = (newId) => {
     setCurrentNodeId(newId);
   }
   const [nodesData, setNodeData] = useRemoteResource(null, {}, 'node_data');
   const [rawNodesData, setRawNodeData] = useRemoteResource(null, {}, 'get_raw_nodes_and_modules', [nodesData]);
-  const [currentExecutionInstances, setCurrentExecutionInstances] = useState([{ frame_time: 0, addr: 0, instance_of_addr: 0 }])
   const [isLoading, setIsLoading] = useState(false);
 
   const [currentFilePath, setCurrentFilePath] = useState("[none selected]");
@@ -44,8 +42,8 @@ function App() {
     <div className="App">
       {isLoading && <LoadingModal />}
       <div style={{margin:"1rem", gap:"1rem", display: "flex", justifyContent: "center" }}>
-        <h1 className='title'>TraceTrail / Execumap </h1>
-        <img style={{ width: "5rem" , height: "5rem"}} src="logo.png" />
+        <h1 className='title'>Explorant </h1>
+        <img style={{ width: "5rem" , height: "5rem"}} src="logo_zoomed.png" />
       </div>
       {generalInfo &&
         <p className='subtitle'>{generalInfo.recording_dir}</p>
@@ -90,10 +88,7 @@ function App() {
           {!currentNodeId.is_raw && <ExecutionInstanceList
             nodesData={nodesData}
             generalInfo={generalInfo}
-            currentNodeId={currentNodeId}
-            setHighlightedNodeIds={setHighlightedNodeIds}
-            executionInstances={currentExecutionInstances}
-            setExecutionInstances={setCurrentExecutionInstances} />}
+            currentNodeId={currentNodeId} />}
         </SplitLayout>
 
       }

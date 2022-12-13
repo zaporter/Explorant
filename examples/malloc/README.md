@@ -4,15 +4,16 @@ git clone https://github.com/bminor/glibc glibc
 {REPLACE malloc.c with my instrumented malloc.c or add your own annotations}
 mkdir glibcbuild
 cd glibcbuild
+mkdir install
 export glibc_install="$(pwd)/install"
 ../glibc/configure --prefix "$glibc_install" CFLAGS="-g3 -O2"
 make -j `nproc`
 make install -j `nproc`
 cd install
-{COPY IN test_glibc.sh}
-{COPY IN test_mmap.c}
-./test_glibc.sh test_mmap
-./test_mmap.out
+{COPY IN build.sh}
+{COPY IN test_malloc.c}
+./test_glibc.sh test_malloc
+./test_malloc.out
 
 
 Then record that.
