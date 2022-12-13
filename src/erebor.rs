@@ -1,4 +1,4 @@
-use crate::shared_structs::{FileInfo, Function, LineLocation, GraphModule, GraphNode};
+use crate::shared_structs::{FileInfo, Function, GraphModule, GraphNode, LineLocation};
 use object::{Object, ObjectSection, ObjectSymbol, ObjectSymbolTable, SectionKind, Segment};
 use symbolic_common::{Language, Name};
 use symbolic_demangle::{Demangle, DemangleOptions};
@@ -28,7 +28,7 @@ use typed_arena::Arena;
 // such as DWARF and gimli
 //
 //
-// Erebor utilizes gimli 
+// Erebor utilizes gimli
 //
 #[derive(Debug, Clone)]
 pub struct Erebor {
@@ -37,7 +37,7 @@ pub struct Erebor {
 }
 
 impl Erebor {
-    pub fn new(obj_file: object::File) -> Self {
+    pub fn new(obj_file: object::File, map: procmaps::Map, offset_addrs_with_map: bool) -> Self {
         // let mut functions = HashMap::<PathBuf, Function>::new();
         // let symbols = get_symbols(&obj_file).unwrap();
         // let mut symbols = Vec::new();
@@ -46,6 +46,25 @@ impl Erebor {
             lines: BTreeMap::new(),
         };
         read_file(&obj_file, &mut me);
+        // TODO
+        // This finds the /FIRST/ map and offsets. Bad.
+        if offset_addrs_with_map {
+            log::info!("Erebor offset map is {:?}", &map);
+            // for map in procmap.iter() {
+            log::error!("{:?}", map);
+            // if map.perms.readable && map.perms.executable && !map.perms.writable {
+
+            for mut file in me.files.values_mut() {
+                for mut func in file.functions.iter_mut() {
+                    func.address += map.base;
+                }
+                for mut line_entry in file.lines.values_mut() {
+                    for mut line_entry_addr in line_entry.iter_mut() {
+                        *line_entry_addr += map.base;
+                    }
+                }
+            }
+        }
         //for symbol in obj_file
         //    .symbol_table()
         //    .ok_or("No symboltable found")
@@ -1745,65 +1764,6 @@ fn dump_line_program<R: Reader, W: Write>(
     if let Some(program) = unit.line_program.clone() {
         {
             let header = program.header();
-            // writeln!(w)?;
-            // writeln!(
-            //     w,
-            //     "Offset:                             0x{:x}",
-            //     header.offset().0
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Length:                             {}",
-            //     header.unit_length()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "DWARF version:                      {}",
-            //     header.version()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Address size:                       {}",
-            //     header.address_size()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Prologue length:                    {}",
-            //     header.header_length()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Minimum instruction length:         {}",
-            //     header.minimum_instruction_length()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Maximum operations per instruction: {}",
-            //     header.maximum_operations_per_instruction()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Default is_stmt:                    {}",
-            //     header.default_is_stmt()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Line base:                          {}",
-            //     header.line_base()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Line range:                         {}",
-            //     header.line_range()
-            // )?;
-            // writeln!(
-            //     w,
-            //     "Opcode base:                        {}",
-            //     header.opcode_base()
-            // )?;
-
-            // writeln!(w)?;
-            // writeln!(w, "Opcodes:")?;
             for (i, length) in header
                 .standard_opcode_lengths()
                 .to_slice()?
@@ -1814,59 +1774,6 @@ fn dump_line_program<R: Reader, W: Write>(
             }
 
             let base = if header.version() >= 5 { 0 } else { 1 };
-            // writeln!(w)?;
-            // writeln!(w, "The Directory Table:")?;
-            // for (i, dir) in header.include_directories().iter().enumerate() {
-            //     writeln!(
-            //         w,
-            //         "  {} {}",
-            //         base + i,
-            //         dwarf.attr_string(unit, dir.clone())?.to_string_lossy()?
-            //     )?;
-            // }
-
-            // writeln!(w)?;
-            // writeln!(w, "The File Name Table")?;
-            // write!(w, "  Entry\tDir\tTime\tSize")?;
-            // if header.file_has_md5() {
-            //     write!(w, "\tMD5\t\t\t\t")?;
-            // }
-            // writeln!(w, "\tName")?;
-            // for (i, file) in header.file_names().iter().enumerate() {
-            //     write!(
-            //         w,
-            //         "  {}\t{}\t{}\t{}",
-            //         base + i,
-            //         file.directory_index(),
-            //         file.timestamp(),
-            //         file.size(),
-            //     )?;
-            //     if header.file_has_md5() {
-            //         let md5 = file.md5();
-            //         write!(w, "\t")?;
-            //         for i in 0..16 {
-            //             write!(w, "{:02X}", md5[i])?;
-            //         }
-            //     }
-            //     writeln!(
-            //         w,
-            //         "\t{}",
-            //         dwarf
-            //             .attr_string(unit, file.path_name())?
-            //             .to_string_lossy()?
-            //     )?;
-            // }
-
-            // writeln!(w)?;
-            // writeln!(w, "Line Number Instructions:")?;
-            // let mut instructions = header.instructions();
-            // while let Some(instruction) = instructions.next_instruction(header)? {
-            //     writeln!(w, "  {}", instruction)?;
-            // }
-
-            // writeln!(w)?;
-            // writeln!(w, "Line Number Rows:")?;
-            // writeln!(w, "<pc>        [lno,col]")?;
         }
         let mut rows = program.rows();
         let mut file_index = std::u64::MAX;
@@ -1880,28 +1787,6 @@ fn dump_line_program<R: Reader, W: Write>(
                 gimli::ColumnType::Column(column) => column.get(),
                 gimli::ColumnType::LeftEdge => 0,
             };
-            // write!(w, "0x{:08x}  [{:4},{:2}]", row.address(), line, column)?;
-            // if row.is_stmt() {
-            //     write!(w, " NS")?;
-            // }
-            // if row.basic_block() {
-            //     write!(w, " BB")?;
-            // }
-            // if row.end_sequence() {
-            //     write!(w, " ET")?;
-            // }
-            // if row.prologue_end() {
-            //     write!(w, " PE")?;
-            // }
-            // if row.epilogue_begin() {
-            //     write!(w, " EB")?;
-            // }
-            // if row.isa() != 0 {
-            //     write!(w, " IS={}", row.isa())?;
-            // }
-            // if row.discriminator() != 0 {
-            //     write!(w, " DI={}", row.discriminator())?;
-            // }
             if file_index != row.file_index() {
                 file_index = row.file_index();
                 if let Some(file) = row.file(header) {
@@ -1934,7 +1819,7 @@ fn dump_line_program<R: Reader, W: Write>(
             file_info_lines
                 .entry(line as u32)
                 .or_insert_with(|| Vec::new())
-                .push(row.address() as usize + 0x555555554000);
+                .push(row.address() as usize);
             // file_info_lines.insert(line as u32, row.address() as usize);
             //
             // insert the line into the erebor lines tree

@@ -35,6 +35,12 @@ impl AddressRecorder {
             records: vec![FtBin::default(); max_frame_time + 2],
         }
     }
+    pub fn clear(&mut self) {
+        self.write_head = 0;
+        self.is_writing_ftbin = false;
+        self.records = vec![FtBin::default(); self.records.len()];
+
+    }
     pub fn reset_ft_for_writing(&mut self, frame_time: usize) {
         debug_assert!(!self.is_writing_ftbin);
         self.records[frame_time].indexes.clear();

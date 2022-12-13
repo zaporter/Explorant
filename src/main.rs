@@ -2,6 +2,9 @@
 #![allow(unused)]
 #![allow(non_snake_case)]
 
+extern crate actix_web;
+extern crate actix_files;
+
 use clap::{Parser, Subcommand};
 use druid_graphviz_layout::adt::dag::NodeHandle;
 use erebor::Erebor;
@@ -45,6 +48,7 @@ mod graph_builder;
 // mod graph_layout;
 // mod gui;
 mod erebor;
+mod gdb_instance_manager;
 mod lcs;
 mod mvp;
 mod query;
@@ -52,7 +56,6 @@ mod recorder;
 mod shared_structs;
 mod simulation;
 mod trampoline;
-mod gdb_instance_manager;
 use crate::lcs::*;
 use crate::query::*;
 use crate::trampoline::*;
@@ -65,21 +68,38 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Commands {
+    /// Record the execution of a program for replay later
     Record {
+        /// Path to the executable
         #[arg(short, long, value_name = "FILE")]
         exe: PathBuf,
+
+        /// Directory to save the trace
         #[arg(short, long, value_name = "FOLDER")]
         save_dir: PathBuf,
-        #[arg(short, long, default_value = "false" ,value_name = "SHOULD RECORD WITH FFMPEG")]
-        record_screen: bool
+
+        /// Should record the screen with ffmpeg and store screenshots
+        #[arg(
+            short,
+            long,
+            default_value = "false",
+            value_name = "SHOULD RECORD WITH FFMPEG"
+        )]
+        record_screen: bool,
     },
+    /// Replay an execution of a trace
     Serve {
-        //#[arg(short, long, value_name = "FOLDER1 FOLDER2 ...")]
-        traces: Vec<PathBuf>,
-    },
-    Mvp {
-        #[arg(short, long, value_name = "FOLDER")]
-        save_dir: PathBuf,
+        /// Path to the save-dir of the last progrm
+        trace: PathBuf,
+        /// By default, this uses the procmap to fix the address offsets. 
+        /// Enabiling this option disables that. If you are writing your own asm
+        /// or compiling glibc, you will want to enable this.
+        #[arg(
+            long,
+            default_value = "false",
+            value_name = "USE PROCMAP TO FIX ADDR OFFSETS"
+        )]
+        no_glibc_offsets: bool,
     },
 }
 
@@ -139,11 +159,13 @@ async fn get_general_info(
 ) -> HttpResponse {
     let mut traces: Vec<TraceGeneralInfo> = Vec::new();
     let mut binary_name: Option<String> = None;
+    let mut recording_dir: Option<PathBuf> = None;
     for (id, simulation) in data.as_ref().traces.iter().enumerate() {
         let mut binary_interface = match simulation.bin_interface.lock() {
             Ok(k) => k,
             Err(k) => return HttpResponse::InternalServerError().body(k.to_string()),
         };
+        recording_dir = Some(simulation.save_directory.clone());
         if binary_name.is_none() {
             binary_name = Some(binary_interface.get_exec_file().into());
         } // TODO ensure binary name is the same across all traces
@@ -159,6 +181,7 @@ async fn get_general_info(
     }
     let data = GeneralInfoResponse {
         binary_name: binary_name.unwrap(),
+        recording_dir: recording_dir.unwrap(),
         traces,
     };
     HttpResponse::Ok().json(data)
@@ -204,17 +227,13 @@ async fn get_addr_occurrences(
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let occurs = graph_builder.get_addr_occurrences(req.synoptic_node_id);
     //TODO
-    let response = AddrOccurrenceResponse {
-        val: occurs,
-    };
+    let response = AddrOccurrenceResponse { val: occurs };
     HttpResponse::Ok().json(response)
 }
 async fn get_node_data(
     data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<NodeDataRequest>,
 ) -> HttpResponse {
-
-    log::error!("GET_S_n");
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let resp = NodeDataResponse {
         modules: graph_builder.modules.clone(),
@@ -226,7 +245,6 @@ async fn get_raw_nodes_and_modules(
     data: web::Data<Arc<SimulationStorage>>,
     _req: web::Json<GetRawNodesAndModulesRequest>,
 ) -> HttpResponse {
-    log::error!("GET_RAW");
     let graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let resp = GetRawNodesAndModulesResponse {
         modules: graph_builder.modules.clone(),
@@ -240,11 +258,12 @@ async fn update_raw_nodes_and_modules(
 ) -> HttpResponse {
     let req = req.0;
 
-    let mut bin_interface = BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
+    let mut bin_interface =
+        BinaryInterface::new_at_target_event(0, data.get_ref().traces[0].save_directory.clone());
     let cthread = bin_interface.get_current_thread();
     bin_interface.pin_mut().set_query_thread(cthread);
     bin_interface.set_pass_signals(vec![
-        0,0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
+        0, 0xe, 0x14, 0x17, 0x1a, 0x1b, 0x1c, 0x21, 0x24, 0x25, 0x2c, 0x4c, 0x97,
     ]);
     let settings: &mut Settings = &mut data.get_ref().settings.lock().unwrap();
     let erebor = data.get_ref().traces[0].dwarf_data.lock().unwrap();
@@ -253,10 +272,8 @@ async fn update_raw_nodes_and_modules(
     graph_builder.update_raw_modules(req.modules).unwrap();
     graph_builder.update_raw_nodes(req.nodes, &erebor).unwrap();
     graph_builder.prepare(&mut bin_interface, req.rerun_level);
-    
 
-    let resp = UpdateRawNodesAndModulesResponse {
-    };
+    let resp = UpdateRawNodesAndModulesResponse {};
     HttpResponse::Ok().json(resp)
 }
 async fn get_all_source_files(
@@ -265,10 +282,8 @@ async fn get_all_source_files(
 ) -> HttpResponse {
     let erebor = data.get_ref().traces[0].dwarf_data.lock().unwrap();
     let out = erebor.files.keys().map(|k| (*k).clone()).collect();
-    
-    let resp = AllSourceFilesResponse {
-        files: out
-    };
+
+    let resp = AllSourceFilesResponse { files: out };
     HttpResponse::Ok().json(resp)
 }
 async fn get_settings(
@@ -303,7 +318,6 @@ async fn get_source_file(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    
     std::env::set_var("RUST_LOG", "debug");
     std::env::set_var("RUST_BACKTRACE", "1");
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
@@ -313,20 +327,27 @@ async fn main() -> std::io::Result<()> {
 
     let cli = Cli::parse();
     match &cli.command {
-        Commands::Record { exe, save_dir, record_screen } => {
+        Commands::Record {
+            exe,
+            save_dir,
+            record_screen,
+        } => {
             recorder::record(exe, save_dir, *record_screen, None);
             Ok(())
         }
-        Commands::Serve { traces } => {
-            return run_server(traces.clone()).await;
-        }
-        Commands::Mvp { save_dir } => {
-            mvp::run(save_dir);
-            Ok(())
+        Commands::Serve {
+            trace,
+            no_glibc_offsets,
+        } => {
+            return run_server(vec![trace.clone()], !*no_glibc_offsets).await;
         }
     }
 }
-async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
+fn react_frontend_app() -> actix_web::Result<actix_files::NamedFile> {
+    let path: PathBuf = PathBuf::from("./frontend/build/index.html");
+    Ok(actix_files::NamedFile::open(path)?)
+}
+async fn run_server(traces: Vec<PathBuf>, offset_addrs_with_map: bool) -> std::io::Result<()> {
     if traces.len() == 0 {
         log::error!("You must pass at least one trace");
         // TODO: Anyhow this with proper msg
@@ -334,17 +355,25 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
     }
     let traces = traces
         .iter()
-        .map(|t| Simulation::new(t.clone()).unwrap())
+        .map(|t| Simulation::new(t.clone(), offset_addrs_with_map).unwrap())
         .collect();
     let simulation: Arc<SimulationStorage> = Arc::new(SimulationStorage {
         traces,
         settings: Mutex::new(Settings::default()),
     });
     let packet_version: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
-    let port = 8080;
-    let ip = "127.0.0.1";
+    let port = 12000;
+    let ip = "0.0.0.0";
     log::info!("Starting HTTP server at {}:{}", &ip, port);
-
+    std::thread::spawn(move || {
+        while port_scanner::local_port_available(12000){
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        std::process::Command::new("/usr/bin/xdg-open")
+                .arg(format!("http://localhost:{}",port))
+                .output()
+                .expect("failed to start web browser at port");
+    });
     HttpServer::new(move || {
         App::new()
             // enable logger
@@ -352,7 +381,7 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .app_data(web::Data::new(simulation.clone()))
             .app_data(web::Data::new(packet_version.clone()))
-            .app_data(web::JsonConfig::default().limit(40000096))
+            .app_data(web::JsonConfig::default().limit(1073741824))
             .service(web::resource("/ping").route(web::post().to(ping)))
             .service(
                 web::resource("/instruction_pointer")
@@ -368,10 +397,19 @@ async fn run_server(traces: Vec<PathBuf>) -> std::io::Result<()> {
             .service(web::resource("/create_gdb_server").route(web::post().to(create_gdb_server)))
             .service(web::resource("/addr_occurrences").route(web::post().to(get_addr_occurrences)))
             .service(web::resource("/source_files").route(web::post().to(get_all_source_files)))
-            .service(web::resource("/get_raw_nodes_and_modules").route(web::post().to(get_raw_nodes_and_modules)))
-            .service(web::resource("/update_raw_nodes_and_modules").route(web::post().to(update_raw_nodes_and_modules)))
+            .service(
+                web::resource("/get_raw_nodes_and_modules")
+                    .route(web::post().to(get_raw_nodes_and_modules)),
+            )
+            .service(
+                web::resource("/update_raw_nodes_and_modules")
+                    .route(web::post().to(update_raw_nodes_and_modules)),
+            )
+            // .route("/", web::get().to(react_frontend_app))
+            .service(actix_files::Files::new("/", "./frontend/build").index_file("index.html"))
+   
     })
-    .workers(3)
+    .workers(8)
     .bind((ip, port))?
     .run()
     .await

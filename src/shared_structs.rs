@@ -92,6 +92,7 @@ pub_struct!(RecordedFramesResponse{
 pub_struct!(GeneralInfoRequest {});
 pub_struct!(GeneralInfoResponse {
     binary_name: String,
+    recording_dir : PathBuf,
     traces: Vec<TraceGeneralInfo>,
 });
 

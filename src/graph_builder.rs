@@ -95,7 +95,7 @@ impl GraphBuilder {
                 let addrs = file_info.lines.get(&((naive_line_num + offset) as u32));
                 if let Some(addrs) = addrs {
                     if addrs.len() > 0 {
-                        event_addr = Some(addrs.first().unwrap().clone() /*+0x555555554000*/);
+                        event_addr = Some(addrs.first().unwrap().clone());
                         final_offset = offset;
                         break 'addr_search;
                     }
@@ -181,6 +181,7 @@ impl GraphBuilder {
             dbg!(self.nodes.len());
 
             let mut opened_frame_time: i64 = bin_interface.current_frame_time();
+            self.address_recorder.clear();
             self.address_recorder
                 .reset_ft_for_writing(opened_frame_time as usize);
 
@@ -317,21 +318,48 @@ impl GraphBuilder {
         'pair: for strict_pair in strict_pairs {
             let source = strict_pair.0;
             let dest = strict_pair.1;
-            for mut group in &mut groups {
+            let mut src_group = None;
+            let mut dest_group = None;
+            for (index,group) in groups.iter().enumerate() {
                 if group.contains(&source) {
-                    if !group.contains(&dest) {
-                        group.push(dest);
+                    if src_group.is_some() {
+                        panic!("Duplicate src group entries. This is not allowed.");
                     }
-                    continue 'pair;
-                } else if group.contains(&dest) {
-                    if !group.contains(&source) {
-                        group.push(source);
+                    src_group = Some(index);
+                }
+                if group.contains(&dest) {
+                    if dest_group.is_some() {
+                        panic!("Duplicate dest group entries. This is not allowed.")
                     }
-                    continue 'pair;
+                    dest_group = Some(index);
                 }
             }
+            if src_group.is_none() && dest_group.is_none() {
+                groups.push(vec![source, dest]);
+            } else if src_group.is_some() && dest_group.is_none() {
+                groups[src_group.unwrap()].push(dest);
+            } else if src_group.is_none() && dest_group.is_some() {
+                groups[dest_group.unwrap()].push(source);
+            } else { //both are some
+                let dest_group_vals = groups[dest_group.unwrap()].clone();
+                groups[src_group.unwrap()].extend(dest_group_vals);
+                groups.swap_remove(dest_group.unwrap());
+            }
+            // for mut group in &mut groups {
+            //     if group.contains(&source) {
+            //         if !group.contains(&dest) {
+            //             group.push(dest);
+            //         }
+            //         continue 'pair;
+            //     } else if group.contains(&dest) {
+            //         if !group.contains(&source) {
+            //             group.push(source);
+            //         }
+            //         continue 'pair;
+            //     }
+            // }
             // Not in any group, create a new group
-            groups.push(vec![source, dest]);
+            // groups.push(vec![source, dest]);
         }
         // Add all of the solo nodes to their own
         // single groups
@@ -553,7 +581,6 @@ impl GraphBuilder {
             let mut digraph = writer.digraph();
             let mut collapsed_module_map: Vec<(Vec<i64>, i64)> =
                 self.get_collapsed_children_recursive(false, "");
-            dbg!(&collapsed_module_map);
 
             self.create_node_recursive(
                 None,

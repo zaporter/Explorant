@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { graphviz } from 'd3-graphviz';
 import { useRemoteResource } from '../util.js';
 import { callRemote } from '../util.js';
+import LoadingModal from './LoadingModal.js';
 import * as d3 from "d3";
 import { Tutorial, GraphViewerHelp } from '../tutorials.js';
 import Switch from "react-switch";
@@ -14,6 +15,7 @@ const getId = () => `graphviz${counter++}`;
 const GraphViewer = (props) => {
   const [height, setHeight] = React.useState(10);
   const [width, setWidth] = React.useState(10);
+  const [isLoading, setIsLoading] = React.useState(false);
   var updateCurrentNode_int = props.updateCurrentNode;
 
   useEffect(() => {
@@ -45,6 +47,7 @@ const GraphViewer = (props) => {
   };
   const interactive = () => {
     console.log("interactive");
+    setIsLoading(false);
     let clusters = d3.selectAll('.cluster');
     clusters
       .on("click", function() {
@@ -114,16 +117,18 @@ const GraphViewer = (props) => {
             })))
   }
   useEffect(() => {
-
     const gviz = graphviz(`#${id}`, { ...defaultOptions });
     gviz.transition(function() {
       return d3.transition()
         .delay(0)
         .duration(100);
     }).renderDot(dotSrc.dot).on("end", interactive);
-    // gviz.renderDot(dotSrc.dot).on("end",interactive);
 
   }, [dotSrc,graphVer,null]);
+
+  useEffect(()=>{
+    setGraphVer(graphVer+1);
+  },[]);
 
   return (
     <div className="box-wrapper">
@@ -136,7 +141,9 @@ const GraphViewer = (props) => {
         <div className="graph-viewer" id={id} />
         <div style={{display:"inline-flex", gap:"20px"}}>
           <p> Display unreachable events: </p>
-        <Switch onChange={handleShowUnreachableNodes} checked={initialSettings.show_unreachable_nodes} />
+          <div style={{padding:"0.9em 0em"}}>
+          <Switch onChange={handleShowUnreachableNodes} checked={initialSettings.show_unreachable_nodes} />
+          </div>
           </div>
       </div>
     </div>

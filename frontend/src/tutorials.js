@@ -34,7 +34,13 @@ export const GraphViewerHelp = () => {
       <div>
       <h2>The Graph Viewer</h2>
         The graph viewer shows the produced graph from executing the trace. Each node corresponds to an event that was executed. However, each event may appear multiple times because <a href="https://github.com/ModelInference/synoptic"> synoptic </a> mines the FSM to simplify analysis and seperate paths that happen to go through the same events though they are different logical paths. 
-        The graph viewer also displays modules and then sections of strictly sequential nodes. For more information on how this works, see the paper.
+        <br/>
+        <br/>
+        The graph viewer also displays modules with thick solid boxes and sections of strictly sequential nodes in dotted boxes. For more information on how this works, see the paper.
+        <br/>
+        <br/>
+        The thickness of each edge indicates how probable that edge is to be traversed. A thick edge was traversed more often than a thin edge.
+
       
       <h3>Interaction Options</h3>
       <ul>
@@ -42,6 +48,7 @@ export const GraphViewerHelp = () => {
         <li><b>Click on the name of a module:</b> Collapse/expand that module</li>
         <li><b>Pan/zoom:</b> Change what file is currently being selected/edited</li>
         <li><b>Show Unreachable Nodes:</b> Display events in the graph that were never reached in the trace</li>
+        <li><b>Press the refresh (↻) button:</b> Reload the graph. This will fix most visual bugs relating to resizing or if the graph didn't load upon starting</li>
         </ul>
     </div>);
 };
@@ -91,10 +98,32 @@ export const ExecutionExplorerHelp = () => {
         <li><b>Press Esc on timeline:</b> Reset timeline zoom</li>
         </ul>
         
-        <h3>Keep in mind:</h3>
+        <h3>Known bugs:</h3>
+        <ul>
+          <li>
         <b>This component does not currently de-allocate the gdb servers so if you click on many of them, you will quickly eat through your computing resources. This is being worked on. </b>
-        <br/>
+          </li>
+          <li>
+        <b>This component shows all instances of this EVENT, not of this NODE within the graph. That means that while you have selected a single node, you are shown all times this event was executed</b>
+          </li>
+          <li>
         <b>The gdb command may not work instantly as the trace is being fast forwarded to desired location. This will become especially apparent when the spot in the execution is very far through the program. This is being worked on. </b>
+            </li>
+          </ul>
+      
+    </div>);
+};
+export const EventLoaderHelp = () => {
+  return (
+      <div>
+      <h2>The Event Saver/Loader</h2>
+
+        <p>This component allows you to save all of the current events and modules (including ones that you edited or added) to a file so that you can reimport them later. <b>If you change the underlying source files in any way, the events will almost certainly not line up.</b>  </p>
+        <br/>
+        <p>This is most useful when you are not able to add annotations directly to the source or when you want to play around with the graph and then add annotations later.</p>
+
+
+  
       
     </div>);
 };

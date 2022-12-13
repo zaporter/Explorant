@@ -93,13 +93,14 @@ const SrcViewer = (props) => {
       <h3>{"Source Viewer"}</h3>
       <Tutorial><SrcReaderHelp/></Tutorial>
     </div>
-    
+    <div style={{padding:"0px 5px 0px 0px"}}>
     <StringCompletionInput 
       key={props.currentFilePath}
       default={props.currentFilePath}
       onUpdate={onUpdate}
       list={allFiles.files.concat(["[none selected]"])}
       />
+      </div>
     <div className="src-inner" 
       onWheel={handleScroll}
       onScroll={(e)=>{e.preventDefault()}}  

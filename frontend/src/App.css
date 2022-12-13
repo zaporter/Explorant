@@ -24,11 +24,16 @@ body {
   }
 }
 .title {
-  
-}
-h1 {
   color: #f19a3e;
   text-align: center;
+  vertical-align:center;
+}
+.subtitle {
+  color: #f19a3e;
+  text-align: center;
+  font-size: 5;
+}
+h1 {
 }
 h3 {
   color: #7fb235;
@@ -132,6 +137,11 @@ h3 {
 .execution-instance-list {
   width:100%;
   border-collapse: collapse;
+}
+.execution-instance-list-scroll{
+  height: 12rem;
+  overflow:auto;
+
 }
 .execution-instance-list-split{
   display: inline-flex;

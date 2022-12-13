@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 
-const SplitLayout = ({ children }) => {
-  const [barPosition, setBarPosition] = useState(50);
+const SplitLayout = ({ children, default_split}) => {
+  const [barPosition, setBarPosition] = useState(default_split?default_split:50);
 
   const handleDragStart = (event) => {
     event.preventDefault();
