@@ -107,7 +107,7 @@ impl GraphBuilder {
         Ok(())
     }
 
-    pub fn get_graph_as_dot(&mut self, settings: &Settings) -> anyhow::Result<Option<String>> {
+    pub fn get_graph_as_dot(&mut self, erebor: &Erebor,settings: &Settings) -> anyhow::Result<Option<String>> {
         if !self.is_prepared {
             return Ok(None);
         }
@@ -117,6 +117,7 @@ impl GraphBuilder {
                 .as_ref()
                 .expect("gml graph was None during get_graph_as_dot"),
             settings,
+            erebor,
         )?;
         Ok(Some(data))
     }
@@ -340,6 +341,7 @@ impl GraphBuilder {
         parent_scope: &mut Scope,
         nodes: &Vec<gml_parser::Node>,
         edges: &Vec<gml_parser::Edge>,
+        erebor: &Erebor,
         settings: &Settings,
         collapsed_module_map: &Vec<(Vec<i64>, i64)>,
     ) {
@@ -432,17 +434,27 @@ impl GraphBuilder {
                 };
                 let mut shape = dot_writer::Shape::Rectangle;
                 let mut name = None;
+                let mut id_str = format!("N{}", node.id);
+                let mut tooltip = id_str.clone();
+
                 'inner: for real_node in self.nodes.values() {
                     if real_node.FQN == *label {
                         if real_node.node_type == "Flow" {
                             shape = dot_writer::Shape::Mdiamond;
                         }
                         name = Some(format!("{}", &real_node.name));
+                        let mut id_str = format!("N{}", node.id);
+                        if let Some(ass_func) = erebor.get_func_for_addr(&real_node.location.file, real_node.address){
+                            let mut ass_func_name = ass_func.demangled_name.clone();
+                            ass_func_name.truncate(10);
+                            tooltip = format!("{}___{}", ass_func_name, id_str);
+                        }
                         break 'inner;
                     }
                 }
                 cluster
                     .node_named(format!("N{}", node.id))
+                    .set("tooltip",&tooltip,false)
                     .set_color(color)
                     .set_shape(shape)
                     .set_label(&name.unwrap());
@@ -461,6 +473,7 @@ impl GraphBuilder {
                     &mut child_scope,
                     nodes,
                     edges,
+                    erebor,
                     settings,
                     collapsed_module_map,
                 );
@@ -539,6 +552,7 @@ impl GraphBuilder {
         &self,
         gml_graph: &gml_parser::Graph,
         settings: &Settings,
+        erebor: &Erebor,
     ) -> anyhow::Result<String> {
         let mut output_bytes = Vec::new();
         {
@@ -553,6 +567,7 @@ impl GraphBuilder {
                 &mut digraph,
                 &gml_graph.nodes,
                 &gml_graph.edges,
+                erebor,
                 settings,
                 &collapsed_module_map,
             );

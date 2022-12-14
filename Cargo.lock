@@ -712,41 +712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "continue_example"
-version = "0.1.0"
-dependencies = [
- "actix-cors",
- "actix-files",
- "actix-web",
- "anyhow",
- "clap 4.0.29",
- "dot-writer",
- "env_logger",
- "fallible-iterator",
- "gimli",
- "gml_parser",
- "iced-x86",
- "itertools 0.10.5",
- "json5",
- "librr_rs",
- "log",
- "nix",
- "object",
- "port_scanner",
- "procmaps",
- "procspawn",
- "rand 0.8.5",
- "regex",
- "rust-lapper",
- "serde",
- "serde_json",
- "serial_test",
- "symbolic-common",
- "typed-arena",
- "uuid 1.2.2",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1001,6 +966,41 @@ checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "explorant"
+version = "0.1.0"
+dependencies = [
+ "actix-cors",
+ "actix-files",
+ "actix-web",
+ "anyhow",
+ "clap 4.0.29",
+ "dot-writer",
+ "env_logger",
+ "fallible-iterator",
+ "gimli",
+ "gml_parser",
+ "iced-x86",
+ "itertools 0.10.5",
+ "json5",
+ "librr_rs",
+ "log",
+ "nix",
+ "object",
+ "port_scanner",
+ "procmaps",
+ "procspawn",
+ "rand 0.8.5",
+ "regex",
+ "rust-lapper",
+ "serde",
+ "serde_json",
+ "serial_test",
+ "symbolic-common",
+ "typed-arena",
+ "uuid 1.2.2",
 ]
 
 [[package]]

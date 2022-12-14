@@ -50,6 +50,7 @@ export const GraphViewerHelp = () => {
         <li><b>Show Unreachable Nodes:</b> Display events in the graph that were never reached in the trace</li>
         <li><b>Rerender Graph on Updates:</b> Toggle graph reloading. Graph reloading is very slow and sometimes it can be helpful to not have it running.</li>
         <li><b>Press the refresh (↻) button:</b> Reload the graph. This will fix most visual bugs relating to resizing or if the graph didn't load upon starting</li>
+        <li><b>Hover over a node:</b> Show the function it was defined in (if this information exists) (truncates to 10 characters)</li>
         </ul>
     </div>);
 };

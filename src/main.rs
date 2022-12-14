@@ -165,9 +165,10 @@ async fn get_current_graph(
     // let mut packet_version = packet_version.get_ref().lock().unwrap();
     // *packet_version+=1;
 
+    let dwarf_data = data.get_ref().traces[0].dwarf_data.lock().unwrap();
     let mut graph_builder = data.get_ref().traces[0].graph_builder.lock().unwrap();
     let settings = data.get_ref().settings.lock().unwrap();
-    let dot_data = graph_builder.get_graph_as_dot(&settings).unwrap();
+    let dot_data = graph_builder.get_graph_as_dot(&dwarf_data,&settings).unwrap();
     // println!("{}",&dot_data.clone().unwrap());
     // dbg!(&data.get_ref().traces.len());
     let response: CurrentGraphResponse = CurrentGraphResponse {

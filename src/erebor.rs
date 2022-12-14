@@ -82,6 +82,19 @@ impl Erebor {
 
         me
     }
+    pub fn get_func_for_addr(&self, file: &PathBuf, addr: usize)->Option<&Function>{
+        let file = self.files.get(file);
+
+        let Some(file) = file else {
+            return None;
+        };
+        for func in &file.functions {
+            if addr>=func.address && addr < (func.address+func.size) {
+                return Some(func);
+            } 
+        }
+        None
+    }
 }
 
 struct SourceFile {
