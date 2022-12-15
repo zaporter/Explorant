@@ -10,7 +10,7 @@
 
 <h4 align="center">A trace-based code exploration tool for understanding new codebases.</h4>
 
-<h5 align="center">This project was completed as part of my <a href="https://www.wpi.edu/academics/undergraduate/major-qualifying-project">MQP </a> at <a href="https://www.wpi.edu/">WPI</a> in collaboration with <a href="https://www.wpi.edu/people/faculty/rjwalls">Professor Robert Walls</a> and <a href="https://www.wpi.edu/people/faculty/gpollice">Professor Gary Pollice</a>.</h5>
+<h5 align="center">This project was completed as part of my <a href="https://www.wpi.edu/academics/undergraduate/major-qualifying-project">MQP </a> at the  <a href="https://cake.wpi.edu/">WPI Cake Lab</a> in collaboration with <a href="https://www.wpi.edu/people/faculty/rjwalls">Professor Robert Walls</a> and <a href="https://www.wpi.edu/people/faculty/gpollice">Professor Gary Pollice</a>.</h5>
 <h5 align="center"><a href="https://raw.githubusercontent.com/zaporter/MQP-Documents/master/Final_Report/build/default/default.pdf">📄 Report</a></h5>
 <h1></h1>
 
