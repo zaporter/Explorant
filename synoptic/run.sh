@@ -1,2 +1,3 @@
 #!/bin/bash
-docker run -v /home/zack/Tools/MQP/code_slicer/synoptic/shared:/shared synoptic/synoptic $1
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+docker run -v "$SCRIPT_DIR/shared:/shared" explorant/synoptic $1
