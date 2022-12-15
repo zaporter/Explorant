@@ -54,6 +54,7 @@ Download and build Explorant:
 git clone https://github.com/zaporter/Explorant
 cd Explorant
 ./docker_perms.sh
+./explorant.sh --help
 ```
 
 
