@@ -1,14 +1,13 @@
 [package]
 name = "explorant"
 version = "0.1.0"
-author = ["zaporter <opensource@zackporter.com>"]
+authors = ["zaporter <opensource@zackporter.com>"]
 description = "Trace based code exploration tool"
 readme = "README.md"
 homepage = "https://github.com/zaporter/Explorant"
 repository = "https://github.com/zaporter/Explorant"
 keywords = ["explore", "trace", "understand", "codebase"]
 edition = "2021"
-rpath=true
 
 [dependencies]
 librr_rs = {git="https://github.com/zaporter/librr_rs"}

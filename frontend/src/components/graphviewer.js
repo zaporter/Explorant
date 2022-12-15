@@ -42,7 +42,7 @@ const GraphViewer = (props) => {
 
   const defaultOptions = {
     fit: false,
-    height: width,
+    height: 675,
     width: width,
     zoom: true,
   };

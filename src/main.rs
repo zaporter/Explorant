@@ -58,8 +58,8 @@ enum Commands {
         )]
         record_screen: bool,
     },
-    /// Replay an execution of a trace
-    Serve {
+    /// Examine a recorded trace
+    Explore {
         /// Path to the save-dir of the last progrm
         trace: PathBuf,
         /// By default, this uses the procmap to fix the address offsets.
@@ -307,7 +307,7 @@ async fn main() -> std::io::Result<()> {
             recorder::record(exe, save_dir, *record_screen, None);
             Ok(())
         }
-        Commands::Serve {
+        Commands::Explore {
             trace,
             no_glibc_offsets,
         } => {

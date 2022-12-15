@@ -204,7 +204,7 @@ impl GraphBuilder {
         }
         // Record locations in test.log, run synoptic, then read the output file
         if run_level == 0 || run_level == 1 {
-            let base = "/home/zack/Tools/MQP/code_slicer";
+            let base = ".";
             // make sure to delete the out.gml file so we don't use stale data
             // intentionally dont fail if the file doesn't exist
             let _ = std::fs::remove_file(format!("{}/synoptic/shared/out.gml", &base));
