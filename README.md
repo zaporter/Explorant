@@ -28,6 +28,17 @@
 
 ## How-to-Use
 
+To use this program, first record an execution of a program and then explore it.
+```
+gcc -g3 examples/simple/simple.c -o examples/simple/a.out
+./explorant.sh record -e examples/simple/a.out -s examples/simple/recording
+./explorant.sh explore examples/simple/recording
+```
+This will pop open Explorant:
+
+<img src="https://github.com/zaporter/MQP-Documents/blob/master/Final_Report/src/images/design-whole.png" alt="Explorant Whole" width="600">
+
+
 ## Install
 
 This project is not yet bundled with any major package manager. For now, you must install from source.
