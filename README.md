@@ -61,7 +61,9 @@ Or permenantly by:
 echo 'kernel.perf_event_paranoid=1' | sudo tee '/etc/sysctl.d/51-enable-perf-events.conf'
 ```
 Install docker: [instructions](https://docs.docker.com/engine/install/ubuntu/)
+  
 Install the rust toolchain: [instructions](https://www.rust-lang.org/tools/install)
+  
 Download and build Explorant:
 ```
 git clone https://github.com/zaporter/Explorant
