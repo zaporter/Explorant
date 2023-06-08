@@ -26,7 +26,10 @@
 
 
 ## Key-Features
-- See the report. I will expand on this later.
+- Reproducibility
+- Ability to share completed graphs
+- Ability to add in-code annotations to serve as documentation
+- Ability to open up a gdb shell on any event during the program's last execution
 
 ## How-to-Use
 
